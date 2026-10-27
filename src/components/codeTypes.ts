@@ -1,0 +1,38 @@
+import {
+  Globe,
+  Type,
+  Wifi,
+  Mail,
+  Phone,
+  Users,
+  MessageSquare,
+  MapPin,
+  CalendarDays,
+  LayoutPanelTop,
+} from "lucide-react";
+export const typeIcons = {
+  url: Globe,
+  text: Type,
+  wifi: Wifi,
+  email: Mail,
+  phone: Phone,
+  vcard: Users,
+  sms: MessageSquare,
+  whatsapp: MessageSquare,
+  location: MapPin,
+  event: CalendarDays,
+  links: LayoutPanelTop,
+};
+export const typeDescriptions = {
+  url: "Any website, one scan away",
+  text: "A message that travels offline",
+  wifi: "Connect without typing a password",
+  email: "Start the right conversation",
+  phone: "Make it easy to say hello",
+  vcard: "Put your details in their contacts",
+  sms: "A ready-to-send text message",
+  whatsapp: "Open a WhatsApp conversation",
+  location: "Help people find their way",
+  event: "Save the date with one scan",
+  links: "Your own beautiful mini website",
+};

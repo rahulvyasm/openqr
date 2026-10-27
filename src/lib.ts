@@ -1,4 +1,32 @@
-export type CodeType = "url" | "text" | "wifi" | "email" | "phone" | "vcard";
+import { calendarEvent } from "../shared/calendar.js";
+import type { QRDesign } from "../shared/qr.js";
+export type { QRDesign } from "../shared/qr.js";
+export type CodeType =
+  | "url"
+  | "text"
+  | "wifi"
+  | "email"
+  | "phone"
+  | "vcard"
+  | "sms"
+  | "whatsapp"
+  | "location"
+  | "event"
+  | "links";
+export type Campaign = {
+  startsAt: string | null;
+  expiresAt: string | null;
+  scanLimit: number | null;
+  utmSource: string;
+  utmMedium: string;
+  utmCampaign: string;
+};
+export type DesignTemplate = {
+  id: string;
+  name: string;
+  color: string;
+  design: QRDesign;
+};
 export type Code = {
   id: string;
   slug: string;
@@ -12,6 +40,8 @@ export type Code = {
   createdAt: string;
   scans: number;
   shortUrl: string;
+  design: QRDesign;
+  campaign: Campaign;
 };
 export type Folder = { id: string; name: string };
 export type User = { id: string; name: string; email: string };
@@ -21,6 +51,10 @@ export type Analytics = {
   daily: { date: string; scans: number }[];
   devices: Record<string, number>;
   days: number;
+  browsers: Record<string, number>;
+  operatingSystems: Record<string, number>;
+  referrers: Record<string, number>;
+  topCodes: { id: string; name: string; scans: number }[];
 };
 export async function api<T>(
   path: string,
@@ -49,6 +83,11 @@ export const typeNames: Record<CodeType, string> = {
   email: "Email",
   phone: "Phone",
   vcard: "Contact card",
+  sms: "SMS",
+  whatsapp: "WhatsApp",
+  location: "Location",
+  event: "Event",
+  links: "Link page",
 };
 export function codeContent(
   code: Pick<Code, "type" | "data" | "dynamic" | "shortUrl">,
@@ -74,7 +113,54 @@ export function codeContent(
       return `tel:${(d.phone || "").replace(/[ ()-]/g, "")}`;
     case "vcard":
       return `BEGIN:VCARD\r\nVERSION:3.0\r\nFN:${esc(d.fullName)}\r\nORG:${esc(d.company)}\r\nTEL:${esc(d.phone)}\r\nEMAIL:${esc(d.email)}\r\nEND:VCARD`;
+    case "sms":
+      return `SMSTO:${(d.phone || "").replace(/[ ()-]/g, "")}:${d.message || ""}`;
+    case "whatsapp":
+      return `https://wa.me/${(d.phone || "").replace(/[^0-9]/g, "")}?text=${encodeURIComponent(d.message || "")}`;
+    case "location":
+      return `https://www.google.com/maps/search/?api=1&query=${Number(d.latitude || 0)},${Number(d.longitude || 0)}`;
+    case "event": {
+      const start = new Date(d.startsAt),
+        end = new Date(d.endsAt);
+      if (!Number.isFinite(+start) || !Number.isFinite(+end))
+        return "Add your event details";
+      return calendarEvent(d);
+    }
+    case "links":
+      return code.shortUrl;
   }
+}
+
+export const emptyCampaign: Campaign = {
+  startsAt: null,
+  expiresAt: null,
+  scanLimit: null,
+  utmSource: "",
+  utmMedium: "",
+  utmCampaign: "",
+};
+export function saveBlob(blob: Blob, name: string) {
+  const url = URL.createObjectURL(blob),
+    a = document.createElement("a");
+  a.href = url;
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+export async function downloadBatch(
+  ids: string[],
+  format: "svg" | "png" = "svg",
+) {
+  const res = await fetch("/api/codes/export", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ids, format }),
+  });
+  if (!res.ok)
+    throw new Error(
+      (await res.json()).error || "Could not prepare the download.",
+    );
+  saveBlob(await res.blob(), "openqr-codes.zip");
 }
 export function exportCsv(analytics: Analytics) {
   const blob = new Blob(

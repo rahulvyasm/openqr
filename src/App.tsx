@@ -1,5 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
-import QRCode from "qrcode";
+import React, { useEffect, useState } from "react";
 import {
   Activity,
   ArrowDownToLine,
@@ -21,25 +20,23 @@ import {
   Loader2,
   LockKeyhole,
   LogOut,
-  Mail,
   Menu,
   MousePointer2,
   Pause,
   Pencil,
-  Phone,
   Play,
   Plus,
   QrCode,
   Search,
   Settings,
   ShieldCheck,
-  Smartphone,
-  Sparkles,
   Trash2,
-  Type,
-  Users,
-  Wifi,
   X,
+  Palette,
+  Upload,
+  ExternalLink,
+  CalendarClock,
+  RefreshCw,
 } from "lucide-react";
 import {
   api,
@@ -49,11 +46,21 @@ import {
   typeNames,
   type Analytics,
   type Code,
-  type CodeType,
+  type DesignTemplate,
   type Folder,
   type User,
 } from "./lib";
 import "./styles.css";
+import "./advanced.css";
+import Modal from "./components/Modal";
+import QrImage from "./components/QrImage";
+import Editor from "./components/Editor";
+import BulkImport from "./components/BulkImport";
+import DesignStudio from "./components/DesignStudio";
+import BatchBar from "./components/BatchBar";
+import DownloadDialog from "./components/DownloadDialog";
+import AnalyticsDetails from "./components/AnalyticsDetails";
+import { typeIcons as icons } from "./components/codeTypes";
 import "@fontsource/dm-sans/latin-400.css";
 import "@fontsource/dm-sans/latin-500.css";
 import "@fontsource/dm-sans/latin-600.css";
@@ -64,14 +71,6 @@ import "@fontsource/manrope/latin-600.css";
 import "@fontsource/manrope/latin-700.css";
 import "@fontsource/manrope/latin-800.css";
 
-const icons = {
-  url: Globe,
-  text: Type,
-  wifi: Wifi,
-  email: Mail,
-  phone: Phone,
-  vcard: Users,
-};
 function Brand() {
   return (
     <div className="brand">
@@ -83,89 +82,6 @@ function Brand() {
         <span className="brand-dot">.</span>
       </span>
     </div>
-  );
-}
-function QrImage({
-  content,
-  color = "#163f32",
-  size = 128,
-}: {
-  content: string;
-  color?: string;
-  size?: number;
-}) {
-  const [src, setSrc] = useState("");
-  const [error, setError] = useState(false);
-  useEffect(() => {
-    let current = true;
-    setError(false);
-    QRCode.toDataURL(content || "OpenQR", {
-      width: size * 2,
-      margin: 3,
-      errorCorrectionLevel: "M",
-      color: { dark: color, light: "#ffffff" },
-    })
-      .then((url) => {
-        if (current) setSrc(url);
-      })
-      .catch(() => {
-        if (current) setError(true);
-      });
-    return () => {
-      current = false;
-    };
-  }, [content, color, size]);
-  return error ? (
-    <div className="qr-error">Content is too long for a QR code.</div>
-  ) : src ? (
-    <img src={src} width={size} height={size} alt="Scannable QR code" />
-  ) : (
-    <div style={{ width: size, height: size }} className="qr-loading">
-      <Loader2 className="spin" />
-    </div>
-  );
-}
-function Modal({
-  children,
-  title,
-  onClose,
-  wide = false,
-}: {
-  children: React.ReactNode;
-  title: string;
-  onClose: () => void;
-  wide?: boolean;
-}) {
-  const ref = useRef<HTMLDialogElement>(null);
-  useEffect(() => {
-    const dialog = ref.current;
-    dialog?.showModal();
-    return () => {
-      dialog?.close();
-    };
-  }, []);
-  return (
-    <dialog
-      ref={ref}
-      className={`modal ${wide ? "modal-wide" : ""}`}
-      onCancel={onClose}
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-      aria-label={title}
-    >
-      <div className="modal-top">
-        <h2>{title}</h2>
-        <button
-          className="icon-button"
-          onClick={onClose}
-          aria-label="Close dialog"
-        >
-          <X size={20} />
-        </button>
-      </div>
-      {children}
-    </dialog>
   );
 }
 function Auth({ setup, onSuccess }: { setup: boolean; onSuccess: () => void }) {
@@ -374,304 +290,6 @@ function ScanChart({ analytics }: { analytics: Analytics | null }) {
     </div>
   );
 }
-function Editor({
-  code,
-  folders,
-  publicUrl,
-  onClose,
-  onSave,
-}: {
-  code?: Code;
-  folders: Folder[];
-  publicUrl: string;
-  onClose: () => void;
-  onSave: () => void;
-}) {
-  const [type, setType] = useState<CodeType>(code?.type || "url");
-  const [dynamic, setDynamic] = useState(code?.dynamic ?? true);
-  const [name, setName] = useState(code?.name || "");
-  const [data, setData] = useState<Record<string, string>>(
-    code?.data || { security: "WPA" },
-  );
-  const [color, setColor] = useState(code?.color || "#163f32");
-  const [folderId, setFolderId] = useState(code?.folderId || "");
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
-  const locked = !!code && !code.dynamic;
-  const changeData = (key: string, value: string) =>
-    setData((d) => ({ ...d, [key]: value }));
-  const field = (
-    key: string,
-    label: string,
-    placeholder: string,
-    inputType = "text",
-    required = false,
-  ) => (
-    <label key={key}>
-      {label}
-      <input
-        type={inputType}
-        value={data[key] || ""}
-        onChange={(e) => changeData(key, e.target.value)}
-        placeholder={placeholder}
-        disabled={locked}
-        required={required}
-        maxLength={key === "text" ? 1500 : 1000}
-      />
-    </label>
-  );
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    setBusy(true);
-    setError("");
-    try {
-      await api(
-        code ? `/codes/${code.id}` : "/codes",
-        {
-          name,
-          type,
-          dynamic: type === "url" && dynamic,
-          data,
-          color,
-          folderId: folderId || null,
-          active: code?.active ?? true,
-        },
-        code ? "PUT" : "POST",
-      );
-      onSave();
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  }
-  return (
-    <Modal
-      wide
-      title={code ? "Edit QR code" : "Create something worth scanning."}
-      onClose={onClose}
-    >
-      <form onSubmit={submit}>
-        <div className="editor-layout">
-          <div className="editor-fields">
-            <span className="small-label">01 / CHOOSE YOUR CONTENT</span>
-            <div className="type-picker">
-              {(Object.keys(typeNames) as CodeType[]).map((t) => {
-                const Icon = icons[t];
-                return (
-                  <button
-                    type="button"
-                    disabled={!!code}
-                    key={t}
-                    className={`type-option ${type === t ? "selected" : ""}`}
-                    onClick={() => {
-                      setType(t);
-                      setDynamic(t === "url");
-                      setError("");
-                    }}
-                  >
-                    <Icon size={18} />
-                    {typeNames[t]}
-                  </button>
-                );
-              })}
-            </div>
-            <label>
-              Code name
-              <input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. Our new website"
-                required
-                maxLength={100}
-                autoFocus
-              />
-            </label>
-            {type === "url" && (
-              <>
-                {field(
-                  "url",
-                  "Website URL",
-                  "https://your-website.com",
-                  "url",
-                  true,
-                )}
-                <label className="toggle-row">
-                  <input
-                    type="checkbox"
-                    checked={dynamic}
-                    onChange={(e) => setDynamic(e.target.checked)}
-                    disabled={!!code}
-                  />
-                  <span>
-                    <strong>Make it dynamic</strong>
-                    <small>Update the destination and track scans.</small>
-                  </span>
-                  <span className="mini-badge">RECOMMENDED</span>
-                </label>
-              </>
-            )}
-            {type === "text" && (
-              <label>
-                Your text
-                <textarea
-                  value={data.text || ""}
-                  onChange={(e) => changeData("text", e.target.value)}
-                  required
-                  maxLength={1500}
-                  disabled={locked}
-                  placeholder="Something you want to share…"
-                />
-              </label>
-            )}
-            {type === "wifi" && (
-              <>
-                {field(
-                  "ssid",
-                  "Network name",
-                  "Your Wi-Fi network",
-                  "text",
-                  true,
-                )}
-                <label>
-                  Security
-                  <select
-                    value={data.security || "WPA"}
-                    onChange={(e) => changeData("security", e.target.value)}
-                    disabled={locked}
-                  >
-                    <option value="WPA">WPA / WPA2 / WPA3</option>
-                    <option value="WEP">WEP</option>
-                    <option value="nopass">Open network</option>
-                  </select>
-                </label>
-                {data.security !== "nopass" &&
-                  field(
-                    "password",
-                    "Network password",
-                    "Wi-Fi password",
-                    "password",
-                  )}
-              </>
-            )}
-            {type === "email" && (
-              <>
-                {field(
-                  "email",
-                  "Email address",
-                  "hello@example.com",
-                  "email",
-                  true,
-                )}
-                {field("subject", "Subject", "Let’s connect")}
-                {field("body", "Message", "Hello there!")}
-              </>
-            )}
-            {type === "phone" &&
-              field("phone", "Phone number", "+1 555 123 4567", "tel", true)}
-            {type === "vcard" && (
-              <>
-                {field("fullName", "Full name", "Alex Morgan", "text", true)}
-                {field("company", "Organization", "Your company")}
-                {field("phone", "Phone", "+1 555 123 4567", "tel")}
-                {field("email", "Email", "alex@example.com", "email")}
-              </>
-            )}
-            {locked && (
-              <p className="hint">
-                Static content is permanent. You can update its name, folder,
-                and color.
-              </p>
-            )}
-            <div className="field-pair">
-              <label>
-                Folder
-                <select
-                  value={folderId}
-                  onChange={(e) => setFolderId(e.target.value)}
-                >
-                  <option value="">No folder</option>
-                  {folders.map((f) => (
-                    <option key={f.id} value={f.id}>
-                      {f.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Code color
-                <div className="color-field">
-                  <input
-                    type="color"
-                    value={color}
-                    onChange={(e) => setColor(e.target.value)}
-                  />
-                  <span>{color.toUpperCase()}</span>
-                </div>
-              </label>
-            </div>
-          </div>
-          <aside className="editor-preview">
-            <span className="small-label">YOUR LIVE PREVIEW</span>
-            <div className="preview-paper">
-              <QrImage
-                size={208}
-                content={codeContent({
-                  type,
-                  data,
-                  dynamic: type === "url" && dynamic,
-                  shortUrl: code?.shortUrl || `${publicUrl}/r/preview`,
-                })}
-                color={color}
-              />
-              <span>{name || "Something wonderful"}</span>
-            </div>
-            <span className="preview-caption">
-              <Smartphone size={15} /> A little code. A big connection.
-            </span>
-            <div className="preview-tip">
-              <Sparkles size={18} />
-              <p>
-                {type === "url" && dynamic
-                  ? "Print it once. Change the destination whenever you need to."
-                  : "Your content is stored right in the QR code. No connection to OpenQR required."}
-              </p>
-            </div>
-            {!code && type === "url" && dynamic && (
-              <p className="hint">
-                The final tracking link is assigned when you save. Download the
-                saved code for printing.
-              </p>
-            )}
-            <p className="hint">
-              Keep a dark code on a white background and test before printing.
-            </p>
-          </aside>
-        </div>
-        <div className="modal-footer">
-          {error && (
-            <span role="alert" className="form-error">
-              {error}
-            </span>
-          )}
-          <button type="button" className="button secondary" onClick={onClose}>
-            Cancel
-          </button>
-          <button className="button primary" disabled={busy}>
-            {busy ? (
-              <Loader2 size={16} className="spin" />
-            ) : (
-              <>
-                <QrCode size={17} />
-                {code ? "Save changes" : "Create QR code"}
-              </>
-            )}
-          </button>
-        </div>
-      </form>
-    </Modal>
-  );
-}
 export default function App() {
   const [auth, setAuth] = useState<{
     setupRequired: boolean;
@@ -697,6 +315,18 @@ export default function App() {
   const [menu, setMenu] = useState("");
   const [mobileNav, setMobileNav] = useState(false);
   const [folderError, setFolderError] = useState("");
+  const [templates, setTemplates] = useState<DesignTemplate[]>([]);
+  const [initialDesign, setInitialDesign] = useState<
+    DesignTemplate | undefined
+  >();
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [selection, setSelection] = useState<string[]>([]);
+  const [download, setDownload] = useState<Code | null>(null);
+  const [pageNumber, setPageNumber] = useState(1);
+  const loadTemplates = () =>
+    api<DesignTemplate[]>("/templates")
+      .then(setTemplates)
+      .catch((e) => notify(e.message));
   const notify = (text: string) => setToast(text);
   const loadAuth = () =>
     api<{ setupRequired: boolean; user: User | null; publicUrl: string }>(
@@ -711,6 +341,9 @@ export default function App() {
         api<Folder[]>("/folders"),
       ]);
       setCodes(c);
+      setSelection((ids) =>
+        ids.filter((id) => c.some((code) => code.id === id)),
+      );
       setFolders(f);
     } catch (e) {
       notify((e as Error).message);
@@ -730,6 +363,7 @@ export default function App() {
     if (auth?.user) {
       refresh();
       loadAnalytics();
+      loadTemplates();
     }
   }, [auth?.user?.id, days]);
   useEffect(() => {
@@ -757,6 +391,10 @@ export default function App() {
     if (menu) document.addEventListener("click", close);
     return () => document.removeEventListener("click", close);
   }, [menu]);
+  useEffect(() => {
+    setPageNumber(1);
+    setSelection([]);
+  }, [search, filter, folder]);
   if (bootError)
     return (
       <div className="boot">
@@ -783,7 +421,23 @@ export default function App() {
   if (!auth.user)
     return <Auth setup={auth.setupRequired} onSuccess={loadAuth} />;
   const totalScans = codes.reduce((n, c) => n + c.scans, 0);
-  const active = codes.filter((c) => c.active).length;
+  const active = codes.filter(
+    (c) =>
+      c.active &&
+      (!c.campaign.startsAt || +new Date(c.campaign.startsAt) <= Date.now()) &&
+      (!c.campaign.expiresAt || +new Date(c.campaign.expiresAt) > Date.now()) &&
+      (!c.campaign.scanLimit || c.scans < c.campaign.scanLimit),
+  ).length;
+  const codeStatus = (c: Code) =>
+    !c.active && c.dynamic
+      ? "Paused"
+      : c.campaign.startsAt && +new Date(c.campaign.startsAt) > Date.now()
+        ? "Scheduled"
+        : c.campaign.expiresAt && +new Date(c.campaign.expiresAt) <= Date.now()
+          ? "Expired"
+          : c.campaign.scanLimit && c.scans >= c.campaign.scanLimit
+            ? "Limit reached"
+            : "Active";
   const filtered = codes.filter(
     (c) =>
       (!folder || c.folderId === folder) &&
@@ -797,12 +451,18 @@ export default function App() {
         .toLowerCase()
         .includes(search.toLowerCase()),
   );
+  const visibleCodes = filtered.slice((pageNumber - 1) * 20, pageNumber * 20);
   const navigate = (next: string, f = "") => {
     setPage(next);
+    setSelection([]);
     setFolder(f);
     setMobileNav(false);
     setSearch("");
     setFilter("all");
+    if (next === "codes" || next === "analytics") {
+      refresh();
+      loadAnalytics();
+    }
   };
   async function toggle(code: Code) {
     try {
@@ -911,6 +571,14 @@ export default function App() {
             <BarChart3 size={19} />
             <span>Analytics</span>
           </button>
+          <button
+            className={page === "designs" ? "nav-item selected" : "nav-item"}
+            onClick={() => navigate("designs")}
+          >
+            <Palette size={19} />
+            <span>Design studio</span>
+            <span className="nav-new">NEW</span>
+          </button>
         </nav>
         <div className="nav-label folder-label">
           <span>FOLDERS</span>
@@ -993,11 +661,13 @@ export default function App() {
             <strong>
               {page === "analytics"
                 ? "Analytics"
-                : page === "settings"
-                  ? "Settings"
-                  : folder
-                    ? folders.find((f) => f.id === folder)?.name
-                    : "My QR codes"}
+                : page === "designs"
+                  ? "Design studio"
+                  : page === "settings"
+                    ? "Settings"
+                    : folder
+                      ? folders.find((f) => f.id === folder)?.name
+                      : "My QR codes"}
             </strong>
           </div>
           <span className="topbar-open">
@@ -1005,7 +675,17 @@ export default function App() {
           </span>
         </header>
         <main className="main-content">
-          {page === "settings" ? (
+          {page === "designs" ? (
+            <DesignStudio
+              templates={templates}
+              onCreate={(t) => {
+                setInitialDesign(t);
+                setEditor("new");
+              }}
+              onRefresh={loadTemplates}
+              notify={notify}
+            />
+          ) : page === "settings" ? (
             <>
               <div className="page-heading">
                 <div>
@@ -1093,13 +773,27 @@ export default function App() {
                       : "Create, manage, and see where your QR codes take people."}
                   </p>
                 </div>
-                <button
-                  className="button primary create-main"
-                  onClick={() => setEditor("new")}
-                >
-                  <Plus size={18} />
-                  Create QR code
-                </button>
+                <div className="heading-actions">
+                  {page === "codes" && (
+                    <button
+                      className="button secondary"
+                      onClick={() => setBulkOpen(true)}
+                    >
+                      <Upload size={16} />
+                      Import CSV
+                    </button>
+                  )}
+                  <button
+                    className="button primary create-main"
+                    onClick={() => {
+                      setInitialDesign(undefined);
+                      setEditor("new");
+                    }}
+                  >
+                    <Plus size={18} />
+                    Create QR code
+                  </button>
+                </div>
               </div>
               <section className="stats-grid">
                 <div className="stat-card">
@@ -1144,11 +838,22 @@ export default function App() {
                     </h2>
                     <p>
                       {analytics?.total
-                        ? `${formatNumber(analytics.total)} connections in the last ${days} days`
+                        ? `${formatNumber(analytics.total)} connection${analytics.total === 1 ? "" : "s"} in the last ${days} days`
                         : "Your next connection is just a scan away."}
                     </p>
                   </div>
                   <div className="chart-actions">
+                    <button
+                      className="icon-button"
+                      aria-label="Refresh scan analytics"
+                      title="Refresh scan analytics"
+                      onClick={() => {
+                        refresh();
+                        loadAnalytics();
+                      }}
+                    >
+                      <RefreshCw size={14} />
+                    </button>
                     {page === "analytics" && (
                       <button
                         className="button secondary small"
@@ -1176,6 +881,14 @@ export default function App() {
                   <ScanChart analytics={analytics} />
                 )}
               </section>
+              {page === "analytics" && (
+                <AnalyticsDetails
+                  data={analytics}
+                  onCode={(id) =>
+                    setDetail(codes.find((c) => c.id === id) || null)
+                  }
+                />
+              )}
               {page === "codes" && (
                 <section className="codes-section">
                   <div className="section-heading codes-heading">
@@ -1188,6 +901,36 @@ export default function App() {
                       <span className="count-badge">{filtered.length}</span>
                     </div>
                     <div className="codes-tools">
+                      {filtered.length > 0 && (
+                        <label className="select-all">
+                          <input
+                            type="checkbox"
+                            aria-label="Select all codes on this page"
+                            checked={
+                              visibleCodes.length > 0 &&
+                              visibleCodes.every((c) =>
+                                selection.includes(c.id),
+                              )
+                            }
+                            onChange={(e) =>
+                              setSelection(
+                                e.target.checked
+                                  ? [
+                                      ...new Set([
+                                        ...selection,
+                                        ...visibleCodes.map((c) => c.id),
+                                      ]),
+                                    ].slice(0, 100)
+                                  : selection.filter(
+                                      (id) =>
+                                        !visibleCodes.some((c) => c.id === id),
+                                    ),
+                              )
+                            }
+                          />
+                          <span>Select page</span>
+                        </label>
+                      )}
                       <div className="search-field">
                         <Search size={16} />
                         <input
@@ -1245,6 +988,20 @@ export default function App() {
                       <CheckCircle2 size={13} /> All changes saved
                     </span>
                   </div>
+                  {selection.length > 0 && (
+                    <BatchBar
+                      ids={selection}
+                      codes={codes}
+                      folders={folders}
+                      onClear={() => setSelection([])}
+                      onDone={() => {
+                        setSelection([]);
+                        refresh();
+                        loadAnalytics();
+                      }}
+                      notify={notify}
+                    />
+                  )}
                   {filtered.length === 0 ? (
                     <div className="empty-state">
                       <div className="empty-illustration">
@@ -1290,14 +1047,35 @@ export default function App() {
                     <div
                       className={`code-list ${view === "grid" ? "grid-view" : ""}`}
                     >
-                      {filtered.map((code) => {
+                      {visibleCodes.map((code) => {
                         const Icon = icons[code.type];
                         return (
-                          <article className="code-row" key={code.id}>
+                          <article
+                            className={`code-row ${selection.includes(code.id) ? "is-selected" : ""}`}
+                            key={code.id}
+                          >
+                            <input
+                              className="row-check"
+                              type="checkbox"
+                              aria-label={`Select ${code.name}`}
+                              checked={selection.includes(code.id)}
+                              disabled={
+                                selection.length >= 100 &&
+                                !selection.includes(code.id)
+                              }
+                              onChange={(e) =>
+                                setSelection((ids) =>
+                                  e.target.checked
+                                    ? [...ids, code.id]
+                                    : ids.filter((id) => id !== code.id),
+                                )
+                              }
+                            />
                             <div className="code-qr">
                               <QrImage
                                 content={codeContent(code)}
                                 color={code.color}
+                                design={code.design}
                                 size={76}
                               />
                             </div>
@@ -1308,9 +1086,7 @@ export default function App() {
                                   className={`code-status ${!code.active && code.dynamic ? "paused" : ""}`}
                                 >
                                   <span />
-                                  {!code.active && code.dynamic
-                                    ? "Paused"
-                                    : "Active"}
+                                  {codeStatus(code)}
                                 </span>
                               </div>
                               <div className="code-link">
@@ -1327,6 +1103,14 @@ export default function App() {
                                 >
                                   {code.dynamic ? "Dynamic" : "Static"}
                                 </span>
+                                {(code.campaign.startsAt ||
+                                  code.campaign.expiresAt ||
+                                  code.campaign.scanLimit) && (
+                                  <span title="Campaign rules enabled">
+                                    <CalendarClock size={11} />
+                                    Campaign
+                                  </span>
+                                )}
                                 {code.folderId && (
                                   <span>
                                     <FolderIcon size={11} />
@@ -1363,14 +1147,14 @@ export default function App() {
                               </span>
                             </button>
                             <div className="row-actions">
-                              <a
+                              <button
                                 className="button secondary small"
-                                href={`/api/codes/${code.id}/download?format=png`}
-                                title="Download PNG"
+                                onClick={() => setDownload(code)}
+                                title="Download QR code"
                               >
                                 <ArrowDownToLine size={16} />
                                 <span>Download</span>
-                              </a>
+                              </button>
                               <div className="menu-anchor">
                                 <button
                                   className="icon-button"
@@ -1414,8 +1198,37 @@ export default function App() {
                                       <Download size={15} />
                                       Download SVG
                                     </a>
+                                    <button
+                                      onClick={async () => {
+                                        try {
+                                          await api(
+                                            `/codes/${code.id}/duplicate`,
+                                            {},
+                                          );
+                                          refresh();
+                                          notify(
+                                            "A fresh copy is ready, with its own tracking link.",
+                                          );
+                                        } catch (e) {
+                                          notify((e as Error).message);
+                                        }
+                                        setMenu("");
+                                      }}
+                                    >
+                                      <Copy size={15} />
+                                      Duplicate code
+                                    </button>
                                     {code.dynamic && (
                                       <>
+                                        <a
+                                          href={code.shortUrl}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          onClick={() => setMenu("")}
+                                        >
+                                          <ExternalLink size={15} />
+                                          Open destination
+                                        </a>
                                         <button
                                           onClick={() => {
                                             setDetail(code);
@@ -1460,6 +1273,32 @@ export default function App() {
                       })}
                     </div>
                   )}
+                  {filtered.length > 20 && (
+                    <div className="pagination">
+                      <span>
+                        {(pageNumber - 1) * 20 + 1}–
+                        {Math.min(pageNumber * 20, filtered.length)} of{" "}
+                        {filtered.length} codes
+                      </span>
+                      <div>
+                        <button
+                          className="button secondary small"
+                          disabled={pageNumber === 1}
+                          onClick={() => setPageNumber((n) => n - 1)}
+                        >
+                          Previous
+                        </button>
+                        <span>Page {pageNumber}</span>
+                        <button
+                          className="button secondary small"
+                          disabled={pageNumber * 20 >= filtered.length}
+                          onClick={() => setPageNumber((n) => n + 1)}
+                        >
+                          Next
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </section>
               )}
               <div className="bottom-banner">
@@ -1492,6 +1331,10 @@ export default function App() {
           code={editor === "new" ? undefined : editor}
           folders={folders}
           publicUrl={auth.publicUrl}
+          templates={templates}
+          initialDesign={editor === "new" ? initialDesign : undefined}
+          initialFolder={folder}
+          onTemplates={loadTemplates}
           onClose={() => setEditor(null)}
           onSave={() => {
             notify(
@@ -1500,11 +1343,31 @@ export default function App() {
                 : "Changes saved.",
             );
             setEditor(null);
+            setPage("codes");
             refresh();
             loadAnalytics();
           }}
         />
       )}{" "}
+      {bulkOpen && (
+        <BulkImport
+          folders={folders}
+          templates={templates}
+          initialFolder={folder}
+          onClose={() => setBulkOpen(false)}
+          onSave={() => {
+            setBulkOpen(false);
+            refresh();
+            loadAnalytics();
+            notify(
+              "Your QR collection is ready. Select your codes to download them together.",
+            );
+          }}
+        />
+      )}
+      {download && (
+        <DownloadDialog code={download} onClose={() => setDownload(null)} />
+      )}
       {folderModal && (
         <Modal
           title="A home for your codes."
@@ -1598,6 +1461,7 @@ export default function App() {
               </button>
             </div>
             {analyticsPanel(detailData)}
+            <AnalyticsDetails data={detailData} onCode={() => {}} />
             <p className="hint">
               Times are grouped by UTC date. Visits to the tracking link count
               as scans; bots may be included.

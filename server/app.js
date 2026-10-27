@@ -12,9 +12,8 @@ import {
 import { promisify } from "node:util";
 import { mkdirSync } from "node:fs";
 import { resolve } from "node:path";
-import QRCode from "qrcode";
 import { z } from "zod";
-import { codeSchema, payload } from "./payload.js";
+import { migrateCodes, registerCodeRoutes } from "./codes.js";
 
 const hashPassword = promisify(scrypt);
 const digest = (value) => createHash("sha256").update(value).digest("hex");
@@ -48,6 +47,7 @@ export function createApp({
     CREATE INDEX IF NOT EXISTS scans_code_date ON scans(code_id, scanned_at);
     CREATE INDEX IF NOT EXISTS codes_owner ON codes(user_id);
     CREATE TABLE IF NOT EXISTS config (key TEXT PRIMARY KEY, value TEXT NOT NULL);`);
+  migrateCodes(db);
   db.prepare("INSERT OR IGNORE INTO config VALUES (?,?)").run(
     "analytics_salt",
     randomBytes(32).toString("hex"),
@@ -72,7 +72,7 @@ export function createApp({
       },
     }),
   );
-  app.use(express.json({ limit: "24kb" }));
+  app.use(express.json({ limit: "2mb" }));
   app.use("/api", (req, res, next) => {
     res.set("Cache-Control", "no-store");
     if (
@@ -203,140 +203,7 @@ export function createApp({
     });
     res.json({ ok: true });
   });
-  const serialize = (row) => ({
-    id: row.id,
-    slug: row.slug,
-    name: row.name,
-    type: row.type,
-    dynamic: !!row.dynamic,
-    data: JSON.parse(row.data),
-    folderId: row.folder_id,
-    color: row.color,
-    active: !!row.active,
-    createdAt: row.created_at,
-    scans: row.scans || 0,
-    shortUrl: `${origin}/r/${row.slug}`,
-  });
-  const findCode = (req) =>
-    db
-      .prepare("SELECT * FROM codes WHERE id=? AND user_id=?")
-      .get(req.params.id, req.user.id);
-  app.get("/api/codes", (req, res) =>
-    res.json(
-      db
-        .prepare(
-          "SELECT c.*, (SELECT COUNT(*) FROM scans WHERE code_id=c.id) AS scans FROM codes c WHERE c.user_id=? ORDER BY c.created_at DESC",
-        )
-        .all(req.user.id)
-        .map(serialize),
-    ),
-  );
-  const validateCode = (body, userId) => {
-    const code = codeSchema.parse(body);
-    const rgb = code.color
-      .slice(1)
-      .match(/../g)
-      .map((hex) => {
-        const value = parseInt(hex, 16) / 255;
-        return value <= 0.04045
-          ? value / 12.92
-          : ((value + 0.055) / 1.055) ** 2.4;
-      });
-    const luminance = 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2];
-    if (1.05 / (luminance + 0.05) < 4.5)
-      throw new Error(
-        "Use a darker QR color for reliable scanning (at least 4.5:1 contrast on white).",
-      );
-    const content = payload(code);
-    QRCode.create(content, { errorCorrectionLevel: "M" });
-    if (
-      code.folderId &&
-      !db
-        .prepare("SELECT id FROM folders WHERE id=? AND user_id=?")
-        .get(code.folderId, userId)
-    )
-      throw new Error("Folder not found.");
-    return code;
-  };
-  app.post("/api/codes", (req, res) => {
-    const c = validateCode(req.body, req.user.id);
-    const id = randomUUID();
-    const slug = randomBytes(8).toString("base64url");
-    db.prepare("INSERT INTO codes VALUES (?,?,?,?,?,?,?,?,?,?,?)").run(
-      id,
-      req.user.id,
-      slug,
-      c.name,
-      c.type,
-      +c.dynamic,
-      JSON.stringify(c.data),
-      c.folderId,
-      c.color,
-      +c.active,
-      new Date().toISOString(),
-    );
-    res
-      .status(201)
-      .json(serialize(db.prepare("SELECT * FROM codes WHERE id=?").get(id)));
-  });
-  app.put("/api/codes/:id", (req, res) => {
-    const old = findCode(req);
-    if (!old) return res.status(404).json({ error: "QR code not found." });
-    const c = validateCode(req.body, req.user.id);
-    if (c.type !== old.type || +c.dynamic !== old.dynamic)
-      return res
-        .status(400)
-        .json({ error: "Code type cannot change after creation." });
-    if (!old.dynamic && JSON.stringify(c.data) !== old.data)
-      return res.status(400).json({
-        error: "Static QR content cannot be edited. Create a new code.",
-      });
-    db.prepare(
-      "UPDATE codes SET name=?,data=?,folder_id=?,color=?,active=? WHERE id=? AND user_id=?",
-    ).run(
-      c.name,
-      JSON.stringify(c.data),
-      c.folderId,
-      c.color,
-      +c.active,
-      old.id,
-      req.user.id,
-    );
-    res.json(serialize(findCode(req)));
-  });
-  app.delete("/api/codes/:id", (req, res) => {
-    if (!findCode(req))
-      return res.status(404).json({ error: "QR code not found." });
-    db.prepare("DELETE FROM codes WHERE id=? AND user_id=?").run(
-      req.params.id,
-      req.user.id,
-    );
-    res.json({ ok: true });
-  });
-  app.get("/api/codes/:id/download", async (req, res) => {
-    const row = findCode(req);
-    if (!row) return res.status(404).json({ error: "QR code not found." });
-    const code = serialize(row);
-    const content = code.dynamic ? code.shortUrl : payload(code);
-    const svg = req.query.format === "svg";
-    const options = {
-      width: 1024,
-      margin: 4,
-      errorCorrectionLevel: "M",
-      color: { dark: code.color, light: "#ffffff" },
-    };
-    res.set(
-      "Content-Disposition",
-      `attachment; filename="openqr-${code.slug}.${svg ? "svg" : "png"}"`,
-    );
-    res
-      .type(svg ? "image/svg+xml" : "image/png")
-      .send(
-        svg
-          ? await QRCode.toString(content, { ...options, type: "svg" })
-          : await QRCode.toBuffer(content, options),
-      );
-  });
+  registerCodeRoutes(app, db, origin, analyticsSalt);
   app.get("/api/folders", (req, res) =>
     res.json(
       db
@@ -365,76 +232,6 @@ export function createApp({
     );
     res.json({ ok: true });
   });
-  app.get("/api/analytics", (req, res) => {
-    const days = [7, 30, 90].includes(Number(req.query.days))
-      ? Number(req.query.days)
-      : 30;
-    const since = new Date(Date.now() - (days - 1) * 86400000);
-    since.setUTCHours(0, 0, 0, 0);
-    const codeId =
-      typeof req.query.codeId === "string" ? req.query.codeId : null;
-    const rows = db
-      .prepare(
-        "SELECT s.* FROM scans s JOIN codes c ON c.id=s.code_id WHERE c.user_id=? AND s.scanned_at>=? AND (? IS NULL OR c.id=?) ORDER BY s.scanned_at",
-      )
-      .all(req.user.id, since.toISOString(), codeId, codeId);
-    const daily = Array.from({ length: days }, (_, i) => {
-      const date = new Date(since.getTime() + i * 86400000)
-        .toISOString()
-        .slice(0, 10);
-      return { date, scans: 0 };
-    });
-    const devices = { Mobile: 0, Desktop: 0, Tablet: 0 };
-    const visitors = new Set();
-    for (const row of rows) {
-      const day = daily.find((d) => d.date === row.scanned_at.slice(0, 10));
-      if (day) day.scans++;
-      devices[row.device]++;
-      visitors.add(row.visitor);
-    }
-    res.json({
-      total: rows.length,
-      uniqueDailyVisitors: visitors.size,
-      daily,
-      devices,
-      days,
-    });
-  });
-  app.get("/r/:slug", (req, res) => {
-    res.set({
-      "Cache-Control": "no-store",
-      "X-Robots-Tag": "noindex, nofollow",
-    });
-    const row = db
-      .prepare("SELECT * FROM codes WHERE slug=? AND dynamic=1")
-      .get(req.params.slug);
-    if (!row)
-      return res
-        .status(404)
-        .type("text")
-        .send("This QR code could not be found.");
-    if (!row.active)
-      return res
-        .status(410)
-        .type("text")
-        .send("This QR code is currently paused. Please contact its owner.");
-    if (req.method === "GET") {
-      const ua = req.get("user-agent") || "";
-      const device = /iPad|Tablet/i.test(ua)
-        ? "Tablet"
-        : /Mobile|Android|iPhone/i.test(ua)
-          ? "Mobile"
-          : "Desktop";
-      const now = new Date().toISOString();
-      const visitor = digest(
-        `${analyticsSalt}|${now.slice(0, 10)}|${req.ip}|${ua}`,
-      );
-      db.prepare(
-        "INSERT INTO scans (code_id,scanned_at,visitor,device) VALUES (?,?,?,?)",
-      ).run(row.id, now, visitor, device);
-    }
-    res.redirect(302, payload({ type: row.type, data: JSON.parse(row.data) }));
-  });
   app.use("/api", (_req, res) =>
     res.status(404).json({ error: "Endpoint not found." }),
   );
@@ -445,6 +242,8 @@ export function createApp({
     }),
   );
   app.use((err, _req, res, _next) => {
+    if (err.domain)
+      return res.status(err.status || 400).json({ error: err.message });
     if (err instanceof z.ZodError)
       return res.status(400).json({
         error: "Check the form fields and try again.",

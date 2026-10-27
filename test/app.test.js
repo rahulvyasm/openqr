@@ -1,6 +1,5 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { once } from "node:events";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -10,65 +9,8 @@ import { createApp } from "../server/app.js";
 import { payload } from "../server/payload.js";
 import { codeContent } from "../src/lib.ts";
 
-async function fixture(t, dbPath = ":memory:") {
-  const { app, db } = createApp({ dbPath, publicUrl: "http://localhost:5173" });
-  const server = app.listen(0, "127.0.0.1");
-  await once(server, "listening");
-  const base = `http://127.0.0.1:${server.address().port}`;
-  t.after(async () => {
-    await new Promise((r) => server.close(r));
-    db.close();
-  });
-  let cookie = "";
-  async function request(
-    path,
-    {
-      method = "GET",
-      body,
-      origin = "http://localhost:5173",
-      authenticated = true,
-      headers = {},
-    } = {},
-  ) {
-    const res = await fetch(base + path, {
-      method,
-      headers: {
-        ...(authenticated && cookie ? { cookie } : {}),
-        ...(origin ? { origin } : {}),
-        ...(body ? { "content-type": "application/json" } : {}),
-        ...headers,
-      },
-      body: body ? JSON.stringify(body) : undefined,
-      redirect: "manual",
-    });
-    if (res.headers.has("set-cookie"))
-      cookie = res.headers.get("set-cookie").split(";")[0];
-    return res;
-  }
-  async function setup() {
-    const res = await request("/api/auth/setup", {
-      method: "POST",
-      body: {
-        name: "Test Owner",
-        email: "owner@example.com",
-        password: "a-secure-test-password",
-      },
-    });
-    assert.equal(res.status, 201);
-    return res;
-  }
-  return { request, setup, db, base };
-}
-const urlCode = (extra = {}) => ({
-  name: "My website",
-  type: "url",
-  dynamic: true,
-  data: { url: "https://example.com/original" },
-  color: "#163f32",
-  folderId: null,
-  active: true,
-  ...extra,
-});
+import { fixture, urlCode } from "./helpers.js";
+
 test("owner setup, sessions, CSRF protection, sign out and sign in", async (t) => {
   const { request, setup } = await fixture(t);
   assert.equal((await request("/api/auth/status")).status, 200);
@@ -332,7 +274,9 @@ test("saved QR codes persist when the server restarts", async (t) => {
       .prepare("INSERT INTO users VALUES (?,?,?,?,?)")
       .run("owner", "owner@example.com", "Owner", "salt", "hash");
     first.db
-      .prepare("INSERT INTO codes VALUES (?,?,?,?,?,?,?,?,?,?,?)")
+      .prepare(
+        "INSERT INTO codes (id,user_id,slug,name,type,dynamic,data,folder_id,color,active,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+      )
       .run(
         "code",
         "owner",

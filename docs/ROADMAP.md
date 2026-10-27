@@ -1,0 +1,60 @@
+# Making OpenQR a serious QR platform
+
+The product direction is a flexible, self-hostable QR platform: useful marketing workflows, consistent designs, permanent links, and data portability. Features should work end to end, preserve printed codes, and have visible operational limits.
+
+## Research baseline
+
+QRCG's [official feature overview](https://www.qr-code-generator.com/features/) describes hosted mobile pages, logo/color/frame customization, scan reports, organization tools, team logins, branded short links/domains, and campaign information. Its [bulk creation guide](https://support.qr-code-generator.com/hc/en-us/articles/7665629629453-How-do-I-create-multiple-QR-Codes-at-the-same-time) covers website, vCard, and text CSV workflows. These public pages were reviewed on October 27, 2026; this is a capability baseline, not a claim about every paid plan or the private account UI.
+
+## Delivered in v0.2
+
+| Area          | Implemented behavior                                                                     |
+| ------------- | ---------------------------------------------------------------------------------------- |
+| Content       | Eleven types, including editable hosted link pages                                       |
+| Branding      | Logo upload, three module/finder styles, caption frames, color contrast checks           |
+| Design reuse  | Five starting designs and owner-saved templates                                          |
+| Bulk workflow | Validated CSV import, atomic writes, selection and folder operations                     |
+| Exports       | SVG, three PNG widths, ZIP bundles, CSV information and daily scan reports               |
+| Campaigns     | Custom permanent slugs, activation/expiry windows, optional lifetime scan caps, UTM tags |
+| Analytics     | Daily scans/unique estimates, devices, browser/OS, referrer hosts, top codes             |
+| Continuity    | Migration preserves existing short links and scans; static codes remain independent      |
+
+## Next: team and production foundation
+
+Build this before presenting OpenQR as a public multi-tenant service.
+
+- Workspaces with owner/admin/editor/viewer roles. Each API and download must verify workspace membership; guests cannot access codes by guessing identifiers.
+- Single-use, expiring invitations with revocation. Expose invite delivery status and a manual copy-link path; do not require a particular email vendor.
+- Owner password recovery via an operator-managed flow, session revocation, profile/password updates, and an audit trail for sensitive actions.
+- Schema migrations with explicit version tracking and rollback guidance, automated database backups, and tested restore procedures.
+- Production configuration checks, health/readiness endpoints, and deployment tests. Choose PostgreSQL for a shared hosted service; keep a supported SQLite path for a single-instance self-hosted installation.
+
+Acceptance: cross-workspace authorization tests pass for every resource; invitations cannot be reused; restoring a backup preserves printed links and scan counts.
+
+## Then: publishing and integrations
+
+- File/media publishing: PDF, images, business/contact pages, menus, app-store routing, and richer page themes. Use bounded uploads, content-type verification, an object-storage adapter, and explicit retention controls.
+- Custom domains with verified ownership, certificate status, domain-to-workspace mapping, and protection against domain takeover. Existing domains must remain routable when codes are edited.
+- Scoped, revocable API keys, published API documentation, per-key rate limits, and idempotent creation for integrations.
+- Background jobs for larger imports/exports with progress, cancellation, resumability, and worker concurrency limits.
+- Webhooks for scan events with signed payloads, bounded retries, delivery logs, and SSRF protection for outbound delivery.
+
+Acceptance: API creation and the UI use the same authorization/validation path; uploads cannot execute as active content; jobs recover after process restarts; domain changes do not silently break printed codes.
+
+## Then: deeper campaign intelligence
+
+- Rules for destination routing by platform, language, or schedule, with a clear fallback and a test tool.
+- Campaign tags and per-folder/date comparisons, goal attribution hooks, and configurable report exports.
+- Optional, documented bot classification and privacy-preserving country/region aggregation using an operator-installed database. Never fabricate location data from missing headers.
+- Password-protected campaigns with a secure public unlock flow, throttling, and no passwords in QR content or scan records.
+- Retention controls, deletion/export workflows, and accessible charts and keyboard workflows.
+
+Acceptance: routing outcomes are reproducible in tests, exclusion rules are disclosed in reports, and privacy choices change the actual stored data.
+
+## Later: enterprise requirements
+
+SSO, two-factor authentication, organization policies, detailed audit logs, high availability, observability, abuse reporting, and security review. These are future requirements, not capabilities advertised by v0.2.
+
+## Release discipline
+
+Keep the repository's chosen visibility. Ship source changes only after tests and a production build pass. Test QR exports by decoding the generated files, check responsive UI in a disposable workspace, and test migrations against the previous schema. Keep live credentials and customer data out of commits and screenshots.

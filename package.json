@@ -1,6 +1,6 @@
 {
   "name": "openqr",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "license": "MIT",
@@ -12,7 +12,7 @@
     "build": "tsc --noEmit && vite build",
     "start": "node server/index.js",
     "test": "node --test test/*.test.js",
-    "format": "prettier --write src server test *.json *.ts *.md *.yaml .github/workflows/*.yml"
+    "format": "prettier --write src server shared test *.json *.ts *.md *.yaml .github/workflows/*.yml"
   },
   "dependencies": {
     "@fontsource/dm-sans": "^5.3.0",
@@ -20,15 +20,19 @@
     "dotenv": "^18.0.9",
     "express": "^5.3.0",
     "express-rate-limit": "^8.7.1",
+    "fflate": "^0.8.3",
     "helmet": "^8.3.0",
     "lucide-react": "^1.62.0",
+    "papaparse": "^5.7.0",
     "qrcode": "^1.5.4",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
+    "sharp": "^0.35.5",
     "zod": "^4.6.7"
   },
   "devDependencies": {
     "@types/node": "^26.6.5",
+    "@types/papaparse": "^5.5.2",
     "@types/qrcode": "^1.5.6",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",

@@ -8,20 +8,49 @@ This is an independent implementation. It does not reuse QR Code Generator's cod
 
 ![OpenQR dashboard](docs/dashboard.jpg)
 
-*Dashboard from a disposable test workspace. Your instance starts empty.*
+_Dashboard from a disposable test workspace. Your instance starts empty._
 
-## What's included in v0.1
+## What's included in v0.2
 
 - Owner account setup and sign-in, password hashing, expiring server-side sessions, and sign-out.
-- Website, plain text, Wi-Fi, email, phone, and vCard QR codes.
+- Eleven QR types: website, plain text, Wi-Fi, email, phone, vCard, SMS, WhatsApp, location, calendar event, and hosted link pages.
 - Dynamic website codes: change destinations without changing the printed QR; pause and resume links.
 - Static codes: content lives directly in the QR and does not depend on the server.
-- Live QR preview, color customization, and high-resolution PNG / vector SVG downloads.
-- Folders, search, filters, and list/grid views.
-- Real redirect analytics: daily scans, approximate daily unique visitors, device categories, and CSV exports for 7/30/90-day ranges.
+- A three-step editor with a shared live preview and export renderer: three module styles, three finder styles, foreground/background colors, logo uploads, caption frames, and five starting designs.
+- Save and reuse your own brand designs, including for bulk imports.
+- Download PNGs at 512, 1024, or 2048 px, and vector SVGs. Select up to 100 codes for ZIP downloads with a manifest or CSV information export.
+- CSV import for website, text, and vCard codes. Up to 100 rows per batch, preview before saving, and atomic validation: a failed row leaves the whole batch unchanged.
+- Hosted, editable mobile link pages with up to 12 links and an about section.
+- Campaign tools: permanent custom short links, activation and expiry times, optional owner-selected scan caps, and website UTM tags.
+- Folders, search, filters, list/grid views, pagination, duplicate codes, and batch move/pause/resume/delete.
+- Real redirect analytics: daily scans, approximate daily unique visitors, devices, browsers, operating systems, referrer hosts, top codes, and CSV exports for 7/30/90-day ranges.
 - SQLite persistence, self-hosted fonts, responsive layouts, Docker configuration, and GitHub Actions checks.
 
 There is no third-party analytics SDK or external font service. No sample scans or prefilled campaigns are added to your workspace.
+
+![OpenQR advanced designer](docs/designer.jpg)
+
+## Upgrading from v0.1
+
+Back up your DATA_DIR, stop the server, install dependencies with `npm ci`, rebuild with `npm run build`, and restart. The schema migrates automatically on startup. Existing code IDs, short links, saved content, and scan history are preserved. Older scans show `Unknown` for newly introduced analytics fields. Changing a design only changes future downloads; copies already printed retain their original design and payload.
+
+## Designer and hosted pages
+
+The designer uses high error correction and preserves QR positioning and timing patterns. Logo uploads accept PNG/JPEG files up to 128 KB and 4 million pixels; the server validates and re-encodes them to a small PNG before storage. SVG uploads, remote logo URLs, and inverted/low-contrast designs are rejected. The code preview and exports share one SVG renderer.
+
+The test suite decodes all 27 combinations of the three module styles, three finder styles, and three frame styles. This is an automated check with representative content, not a guarantee for every printer or camera: test your final design at its intended print size.
+
+The Docker image includes DejaVu fonts for PNG frame captions. Native Linux hosts also need an installed font family (for example, DejaVu Sans) for server-rendered captions.
+
+Choose **Link page** in the editor to build a mobile page hosted behind its permanent `/r/` link. The page is publicly accessible to anyone with the link while active, and visits count in analytics. Content is escaped and links must use HTTP(S). Deleting or pausing the code also makes its hosted page unavailable.
+
+## Campaigns and CSV workflows
+
+Campaign dates are entered in the browser's local time zone and stored in UTC. Scan caps count successful GET visits over the code's lifetime, including clicks and bots. A code that is paused, outside its date window, or at its cap does not record further successful scans. These caps are optional campaign controls; OpenQR does not impose a subscription scan quota. Short-link slugs are permanent after creation.
+
+For CSV imports, download the sample for your content type in **Import CSV**. Required headers are `name,url`, `name,text`, or `name,fullname`. vCard rows may include `company,phone,email`; all rows may include an optional unique `slug`. Standard comma/semicolon CSV, quoted fields, and multiline text are parsed by Papa Parse. Every row must validate before any code is saved. Batch sizes are bounded for predictable memory use on small self-hosted servers.
+
+Select codes to download a ZIP of PNGs or SVGs, export code information as CSV, move them into a folder, or pause/resume dynamic codes. Static codes cannot be paused. A duplicate gets a new tracking link and a fresh scan history.
 
 ## Run locally
 
@@ -76,11 +105,16 @@ npm test
 npm run build
 ```
 
-Tests exercise authentication, CSRF protection, redirect tracking, destination edits, pause/delete behavior, static content immutability, folders, validation, and database persistence. Download tests decode generated PNGs to check the actual encoded QR content.
+Tests exercise authentication, CSRF protection, ownership isolation, redirect tracking, destination edits, campaign limits, safe hosted pages, static content immutability, folders, atomic bulk operations, ZIP contents, template persistence, and migration from the original database schema. Download tests decode generated PNGs to check the actual encoded QR content, including every module/finder/frame combination and a logo-bearing code.
 
 ```
 src/                React interface and browser helpers
-server/app.js       Express app, auth, SQLite schema, API and redirects
+src/components/     Editor, designer, bulk workflows, analytics and dialogs
+shared/             Shared SVG renderer and calendar payload encoding
+server/app.js       Express app, auth, base SQLite schema and folders
+server/codes.js     Migrations, codes, campaigns, templates and analytics
+server/design.js    Logo sanitization, SVG/PNG rendering
+server/pages.js     Safe public mobile pages
 server/payload.js   QR content validation and encoding
 server/index.js     Environment and process lifecycle
 test/               API and QR decoding tests
@@ -90,7 +124,7 @@ test/               API and QR decoding tests
 
 Only visits to dynamic `/r/:slug` tracking links are measured. Static codes are not tracked. HTTP GET visits count as scans, including clicks and bots; this is not a camera-scan detector. HEAD requests do not count. UTC dates define daily buckets.
 
-Approximate unique visitors are salted hashes of IP address, user agent, and UTC date; raw IPs and user agents are not saved in the scan table. The same visitor on different days counts again. Counts are estimates and may be affected by shared IPs, bots, or changing devices. The SQLite database retains scan records until the code is deleted. There is no geolocation or tracking cookie on redirect requests.
+Approximate unique visitors are salted hashes of IP address, user agent, and UTC date; raw IPs and user agents are not saved in the scan table. The same visitor on different days counts again. Counts are estimates and may be affected by shared IPs, bots, or changing devices. Browser and OS categories are inferred from the user agent. Referrer hosts are stored without paths or query strings; scanner apps typically report no referrer. The SQLite database retains scan records until the code is deleted. There is no geolocation or tracking cookie on redirect requests.
 
 Auth cookies are HttpOnly and SameSite=Strict, and Secure when COOKIE_SECURE=true. API writes require same-origin requests; auth and API endpoints are rate-limited. Stored QR content, including Wi-Fi passwords, is readable by the workspace owner and anyone with database access. Protect the database and backups accordingly.
 
@@ -100,7 +134,7 @@ Back up your complete DATA_DIR and preserve your public domain. Stop the server 
 
 ## Scope and roadmap
 
-v0.1 is a working single-owner workspace, not feature parity with a commercial SaaS. Planned areas include multiple users and teams, password recovery, bulk creation, branded landing pages/file uploads, custom domains per workspace, an API-key API, logo embedding, and more advanced analytics. Billing and subscription limits are intentionally outside this self-hosted edition.
+v0.2 is a working single-owner workspace, not complete feature parity with a commercial SaaS. The [competitive roadmap](docs/ROADMAP.md) covers team roles, account recovery, custom domains, file/media pages, API keys, routing rules, audit logs, and production hosting. Billing and subscription limits are outside this self-hosted edition. A private GitHub repository stays private; the MIT license does not automatically publish its contents.
 
 ## Open source
 
