@@ -9,6 +9,10 @@ import {
   MapPin,
   CalendarDays,
   LayoutPanelTop,
+  FileText,
+  ContactRound,
+  Building2,
+  Share2,
 } from "lucide-react";
 export const typeIcons = {
   url: Globe,
@@ -22,6 +26,10 @@ export const typeIcons = {
   location: MapPin,
   event: CalendarDays,
   links: LayoutPanelTop,
+  pdf: FileText,
+  contact: ContactRound,
+  business: Building2,
+  social: Share2,
 };
 export const typeDescriptions = {
   url: "Any website, one scan away",
@@ -35,4 +43,8 @@ export const typeDescriptions = {
   location: "Help people find their way",
   event: "Save the date with one scan",
   links: "Your own beautiful mini website",
+  pdf: "Publish a document. Replace it after printing.",
+  contact: "A digital business card with a save-contact button",
+  business: "Your business, hours, and directions in one place",
+  social: "Bring every social channel together",
 };

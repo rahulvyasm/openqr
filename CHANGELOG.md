@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.4.0 — 2026-10-27
+
+- Add PDF publishing and a self-hosted PDF.js reader with page navigation, zoom, extracted text, and downloads. Replacing documents preserves printed QR links.
+- Add themed digital contacts, downloadable vCards, business pages with weekly hours/directions, and social pages with platform links.
+- Add a workspace media library with content-verified, bounded PDF/image uploads and reusable sanitized logos. Protect private files and enforce code-bound public access, pause/expiry, and reference-aware deletion.
+- Expand the visual designer with seven module styles, seven frame choices, separate inner/outer finders, individual corner styling/colors, logo sizing, symbols, caption positioning, and undo/redo/reset.
+- Add automatic and manual database/media snapshots, archive retention, checksum validation, and offline restore that preserves the previous installation data.
+- Migrate existing databases without changing sessions, code IDs, printed links, or scan history.
+- Test styled QR decoding, media privacy/roles, page validation, ticket expiry, document replacement, vCard escaping, migration, and backup restoration/tampering.
+
 ## 0.3.0 — 2026-10-27
 
 - Add workspaces and Owner/Admin/Editor/Viewer roles with resource isolation and read-only Viewer exports.

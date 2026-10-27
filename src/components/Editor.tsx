@@ -25,12 +25,16 @@ import {
   type DesignTemplate,
   type QRDesign,
   type Campaign,
+  defaultPageOptions,
+  isHosted,
 } from "../lib";
 import { defaultDesign } from "../../shared/qr.js";
 import Modal from "./Modal";
 import QrImage from "./QrImage";
-import DesignControls from "./DesignControls";
+import DesignControls from "./Designer";
 import { typeIcons, typeDescriptions } from "./codeTypes";
+import PublishingFields, { PagePreview } from "./PublishingFields";
+import { useDesignHistory } from "./useDesignHistory";
 
 const localDate = (value?: string | null) => {
   if (!value) return "";
@@ -64,23 +68,35 @@ export default function Editor({
     [type, setType] = useState<CodeType>(code?.type || "url"),
     [dynamic, setDynamic] = useState(code?.dynamic ?? true),
     [name, setName] = useState(code?.name || "");
+  const [preview, setPreview] = useState<"qr" | "page">(
+    code && ["pdf", "contact", "business", "social"].includes(code.type)
+      ? "page"
+      : "qr",
+  );
+  const hasPagePreview = ["pdf", "contact", "business", "social"].includes(
+    type,
+  );
   const [data, setData] = useState<Record<string, string>>(
     code?.data || {
       security: "WPA",
       links: JSON.stringify([{ title: "", url: "" }]),
     },
   );
-  const [color, setColor] = useState(
-      code?.color || initialDesign?.color || "#163f32",
-    ),
-    [design, setDesign] = useState<QRDesign>({
-      ...defaultDesign,
-      ...(code?.design || initialDesign?.design),
-    }),
-    [campaign, setCampaign] = useState<Campaign>({
-      ...emptyCampaign,
-      ...code?.campaign,
-    });
+  const history = useDesignHistory({
+    color: code?.color || initialDesign?.color || "#163f32",
+    design: { ...defaultDesign, ...(code?.design || initialDesign?.design) },
+  });
+  const { color, design } = history.current;
+  const setColor = (color: string) => history.change({ color, design });
+  const setDesign = (design: QRDesign) => history.change({ color, design });
+  const [pageOptions, setPageOptions] = useState({
+    ...defaultPageOptions,
+    ...code?.pageOptions,
+  });
+  const [campaign, setCampaign] = useState<Campaign>({
+    ...emptyCampaign,
+    ...code?.campaign,
+  });
   const [folderId, setFolderId] = useState(
       code?.folderId || initialFolder || "",
     ),
@@ -88,7 +104,7 @@ export default function Editor({
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
   const locked = !!code && !code.dynamic,
-    isDynamic = type === "links" || (type === "url" && dynamic);
+    isDynamic = isHosted(type) || (type === "url" && dynamic);
   const changeData = (key: string, value: string) =>
     setData((d) => ({ ...d, [key]: value }));
   const changeCampaign = <K extends keyof Campaign>(
@@ -157,6 +173,7 @@ export default function Editor({
           data,
           color,
           design,
+          pageOptions,
           campaign: isDynamic ? campaign : emptyCampaign,
           folderId: folderId || null,
           active: code?.active ?? true,
@@ -194,7 +211,10 @@ export default function Editor({
                 type="button"
                 key={i}
                 className={step === i ? "active" : step > i ? "complete" : ""}
-                onClick={() => setStep(i)}
+                onClick={() => {
+                  setStep(i);
+                  if (i === 1) setPreview("qr");
+                }}
               >
                 <span>{step > i ? <Check size={13} /> : i + 1}</span>
                 {String(label)}
@@ -222,7 +242,13 @@ export default function Editor({
                         className={`type-option ${type === t ? "selected" : ""}`}
                         onClick={() => {
                           setType(t);
-                          setDynamic(["url", "links"].includes(t));
+                          setPreview(
+                            ["pdf", "contact", "business", "social"].includes(t)
+                              ? "page"
+                              : "qr",
+                          );
+                          setDynamic(t === "url" || isHosted(t));
+                          if (t === "business") changeData("links", "[]");
                           setError("");
                         }}
                         title={typeDescriptions[t]}
@@ -244,6 +270,15 @@ export default function Editor({
                     maxLength={100}
                   />
                 </label>
+                {["pdf", "contact", "business", "social"].includes(type) && (
+                  <PublishingFields
+                    type={type}
+                    data={data}
+                    onData={changeData}
+                    options={pageOptions}
+                    onOptions={setPageOptions}
+                  />
+                )}
                 {type === "url" && (
                   <>
                     {field(
@@ -485,6 +520,11 @@ export default function Editor({
                 onDesign={setDesign}
                 templates={templates}
                 onTemplates={onTemplates}
+                onApply={history.change}
+                onUndo={history.undo}
+                onRedo={history.redo}
+                canUndo={history.canUndo}
+                canRedo={history.canRedo}
               />
             )}{" "}
             {step === 2 && (
@@ -623,26 +663,50 @@ export default function Editor({
             )}
           </div>
           <aside className="editor-preview">
-            <span className="small-label">YOUR CONNECTION, TAKING SHAPE</span>
-            <div className="preview-paper">
-              <QrImage
-                size={224}
-                content={codeContent({
-                  type,
-                  data,
-                  dynamic: isDynamic,
-                  shortUrl:
-                    code?.shortUrl || `${publicUrl}/r/${slug || "preview"}`,
-                })}
-                color={color}
-                design={design}
-              />
-              <span>{name || "Something wonderful"}</span>
-            </div>
-            <span className="preview-caption">
-              <Smartphone size={15} />
-              Made for the moment someone scans.
-            </span>
+            {hasPagePreview && (
+              <div className="preview-switch segmented">
+                <button
+                  type="button"
+                  className={preview === "qr" ? "active" : ""}
+                  onClick={() => setPreview("qr")}
+                >
+                  QR code
+                </button>
+                <button
+                  type="button"
+                  className={preview === "page" ? "active" : ""}
+                  onClick={() => setPreview("page")}
+                >
+                  Landing page
+                </button>
+              </div>
+            )}
+            {(!hasPagePreview || preview === "qr") && (
+              <>
+                <span className="small-label">
+                  YOUR CONNECTION, TAKING SHAPE
+                </span>
+                <div className="preview-paper">
+                  <QrImage
+                    size={224}
+                    content={codeContent({
+                      type,
+                      data,
+                      dynamic: isDynamic,
+                      shortUrl:
+                        code?.shortUrl || `${publicUrl}/r/${slug || "preview"}`,
+                    })}
+                    color={color}
+                    design={design}
+                  />
+                  <span>{name || "Something wonderful"}</span>
+                </div>
+                <span className="preview-caption">
+                  <Smartphone size={15} />
+                  Made for the moment someone scans.
+                </span>
+              </>
+            )}
             {type === "links" && (
               <div className="landing-mini-preview">
                 <span style={{ background: color }}>
@@ -657,6 +721,9 @@ export default function Editor({
                   </div>
                 ))}
               </div>
+            )}
+            {hasPagePreview && preview === "page" && (
+              <PagePreview type={type} data={data} options={pageOptions} />
             )}
             <div className="preview-tip">
               <Sparkles size={18} />

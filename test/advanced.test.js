@@ -520,7 +520,7 @@ test("legacy v0.1 databases migrate without changing printed tracking links or s
     );
     assert.equal(
       upgraded.db.prepare("PRAGMA user_version").get().user_version,
-      3,
+      4,
     );
     upgraded.db.close();
     upgraded = null;

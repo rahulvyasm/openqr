@@ -5,3 +5,4 @@ data
 .git
 test
 *.log
+public/pdfjs

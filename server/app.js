@@ -4,19 +4,25 @@ import { rateLimit } from "express-rate-limit";
 import { DatabaseSync } from "node:sqlite";
 import { randomBytes, randomUUID } from "node:crypto";
 import { mkdirSync } from "node:fs";
-import { resolve } from "node:path";
+import { resolve, dirname, join } from "node:path";
 import { z } from "zod";
 import { migrateCodes, registerCodeRoutes } from "./codes.js";
 
 import { migrateWorkspaces, registerWorkspaceRoutes } from "./workspaces.js";
 import { registerAuth } from "./auth.js";
 import { access, problem } from "./security.js";
+import {
+  createStorage,
+  migratePublishing,
+  registerAssetRoutes,
+} from "./storage.js";
 
 export function createApp({
   dbPath,
   publicUrl = "http://localhost:5173",
   secureCookie = false,
   trustProxy = false,
+  storageDir,
 } = {}) {
   const origin = new URL(publicUrl).origin;
   if (!dbPath) {
@@ -36,6 +42,7 @@ export function createApp({
   try {
     migrateCodes(db);
     migrateWorkspaces(db);
+    migratePublishing(db);
   } catch (error) {
     db.close();
     throw error;
@@ -48,6 +55,12 @@ export function createApp({
     .prepare("SELECT value FROM config WHERE key=?")
     .get("analytics_salt").value;
   const app = express();
+  const storage = createStorage(
+    storageDir ||
+      (dbPath === ":memory:"
+        ? undefined
+        : join(dirname(resolve(dbPath)), "media")),
+  );
   app.disable("x-powered-by");
   if (trustProxy) app.set("trust proxy", 1);
   app.use(
@@ -57,7 +70,9 @@ export function createApp({
           defaultSrc: ["'self'"],
           imgSrc: ["'self'", "data:", "blob:"],
           styleSrc: ["'self'", "'unsafe-inline'"],
-          scriptSrc: ["'self'"],
+          scriptSrc: ["'self'", "'wasm-unsafe-eval'"],
+          workerSrc: ["'self'", "blob:"],
+          fontSrc: ["'self'", "data:", "blob:"],
           connectSrc: ["'self'"],
           upgradeInsecureRequests: null,
         },
@@ -130,7 +145,8 @@ export function createApp({
       req.assertEdit();
     next();
   });
-  registerCodeRoutes(app, db, origin, analyticsSalt);
+  registerAssetRoutes(app, db, storage);
+  registerCodeRoutes(app, db, origin, analyticsSalt, storage);
   app.get("/api/folders", (req, res) =>
     res.json(
       db
@@ -197,5 +213,5 @@ export function createApp({
       error: safe ? err.message : "Something went wrong. Please try again.",
     });
   });
-  return { app, db };
+  return { app, db, storage };
 }

@@ -27,18 +27,27 @@ QRCG's [official feature overview](https://www.qr-code-generator.com/features/) 
 - Account/team security activity logs without live tokens or passwords.
 - Transactional migration preserving old folder references, designs, sessions, password hashes, and printed links.
 
+## Delivered in v0.4
+
+- PDF publishing with document replacement behind permanent links and a local PDF.js reader.
+- Digital contact/vCard downloads, business pages with hours/directions, and social pages.
+- Workspace media storage, bounded verified uploads, shared logo reuse, and code-bound public file access.
+- Mobile page themes and QR/landing-page previews.
+- Visual frame/module libraries, independent finder/corner shapes and colors, symbols, logo sizing, caption placement, and undo/redo/reset.
+- Scheduled/manual SQLite + media snapshots, retention, integrity checks, offline restore, and preserved previous data.
+
 ## Next: production operations
 
 Build this before presenting OpenQR as a public multi-tenant service.
 
-- Automated database backups, tested restore procedures, and improved operational rollback tooling. Schema versions and transactional migrations are already in place.
+- Off-server backup destinations, storage monitoring, recovery drills, and stronger operational rollback tooling. Local snapshots and tested restore are in place.
 - Production configuration checks, health/readiness endpoints, and deployment tests. Choose PostgreSQL for a shared hosted service; keep a supported SQLite path for a single-instance self-hosted installation.
 
 Acceptance: restoring a backup preserves printed links, workspace memberships, and scan counts. Keep the existing cross-workspace/role, invitation-reuse, and legacy-migration checks passing.
 
 ## Then: publishing and integrations
 
-- File/media publishing: PDF, images, business/contact pages, menus, app-store routing, and richer page themes. Use bounded uploads, content-type verification, an object-storage adapter, and explicit retention controls.
+- Expand publishing to image galleries, restaurant menus, app-store routing, audio/video, and richer page templates. Add an object-storage adapter, storage quotas, and retention controls to the existing bounded uploads.
 - Custom domains with verified ownership, certificate status, domain-to-workspace mapping, and protection against domain takeover. Existing domains must remain routable when codes are edited.
 - Scoped, revocable API keys, published API documentation, per-key rate limits, and idempotent creation for integrations.
 - Background jobs for larger imports/exports with progress, cancellation, resumability, and worker concurrency limits.
@@ -63,3 +72,7 @@ SSO, two-factor authentication, organization policies, detailed audit logs, high
 ## Release discipline
 
 Keep the repository's chosen visibility. Ship source changes only after tests and a production build pass. Test QR exports by decoding the generated files, check responsive UI in a disposable workspace, and test migrations against the previous schema. Keep live credentials and customer data out of commits and screenshots.
+
+## Remaining screenshot parity
+
+The supplied QRCG screens also show hosted events, galleries, audio/video, coupons, feedback/ratings, app routing, and GS1 2D barcodes. These are still future work. GS1 needs standards-based identifier validation and Digital Link behavior; it is not a renamed URL code. Interactive pages need response storage, moderation, abuse controls, and deletion/export rules.

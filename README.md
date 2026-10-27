@@ -10,15 +10,15 @@ This is an independent implementation. It does not reuse QR Code Generator's cod
 
 _Dashboard from a disposable test workspace. Your instance starts empty._
 
-## What's included in v0.3
+## What's included in v0.4
 
 - Account setup, invite-based team signup, password updates, operator-managed recovery, session management, and profile settings.
 - Workspaces with Owner, Admin, Editor, and Viewer roles enforced by the server across codes, exports, folders, designs, analytics, and team administration.
 - Single-use invitations, expiry, renewal, revocation, password-confirmed ownership transfer, and a workspace security activity log.
-- Eleven QR types: website, plain text, Wi-Fi, email, phone, vCard, SMS, WhatsApp, location, calendar event, and hosted link pages.
+- Fifteen QR types: website, plain text, Wi-Fi, email, phone, vCard, SMS, WhatsApp, location, calendar event, link page, PDF, digital contact, business page, and social media.
 - Dynamic website codes: change destinations without changing the printed QR; pause and resume links.
 - Static codes: content lives directly in the QR and does not depend on the server.
-- A three-step editor with a shared live preview and export renderer: three module styles, three finder styles, foreground/background colors, logo uploads, caption frames, and five starting designs.
+- A three-step editor with visual galleries: seven module styles, four finder styles, independent inner/outer and per-corner styles/colors, seven frame choices, top/bottom captions, logo sizing, built-in symbols, and undo/redo/reset. Preview and downloads share one renderer.
 - Save and reuse your own brand designs, including for bulk imports.
 - Download PNGs at 512, 1024, or 2048 px, and vector SVGs. Select up to 100 codes for ZIP downloads with a manifest or CSV information export.
 - CSV import for website, text, and vCard codes. Up to 100 rows per batch, preview before saving, and atomic validation: a failed row leaves the whole batch unchanged.
@@ -26,17 +26,22 @@ _Dashboard from a disposable test workspace. Your instance starts empty._
 - Campaign tools: permanent custom short links, activation and expiry times, optional owner-selected scan caps, and website UTM tags.
 - Folders, search, filters, list/grid views, pagination, duplicate codes, and batch move/pause/resume/delete.
 - Real redirect analytics: daily scans, approximate daily unique visitors, devices, browsers, operating systems, referrer hosts, top codes, and CSV exports for 7/30/90-day ranges.
-- SQLite persistence, self-hosted fonts, responsive layouts, Docker configuration, and GitHub Actions checks.
+- Workspace media library for PDFs, portraits, cover images, and reusable logos. PDF.js reader with page navigation, zoom, text extraction, and downloads.
+- Themed digital contact cards with vCard downloads, business pages with hours/directions, and social pages with platform links.
+- Database + media snapshot backups, automatic retention, checksum validation, and offline restore with preservation of previous data.
+- SQLite persistence, self-hosted fonts/PDF resources, responsive layouts, Docker configuration, and GitHub Actions checks.
 
 There is no third-party analytics SDK or external font service. No sample scans or prefilled campaigns are added to your workspace.
 
-![OpenQR advanced designer](docs/designer.jpg)
+![OpenQR advanced designer](docs/designer-v04.jpg)
 
-## Upgrading from v0.1 or v0.2
+## Upgrading from v0.1, v0.2, or v0.3
 
 Back up your DATA_DIR, stop the server, install dependencies with `npm ci`, rebuild with `npm run build`, and restart. The schema migrates automatically on startup. Existing code IDs, short links, saved content, and scan history are preserved. Older scans show `Unknown` for newly introduced analytics fields. Changing a design only changes future downloads; copies already printed retain their original design and payload.
 
 v0.3 assigns each existing account and its codes, folders, designs, and sessions to an owner workspace. Existing password hashes remain compatible. No printed links change. The migration runs transactionally and checks database references before committing; schema versions from a newer release are rejected rather than downgraded.
+
+v0.4 adds workspace media metadata and page themes. Files live in DATA_DIR/media; keep the entire data directory on a persistent volume. Existing QR payloads, URLs, sessions, and scan history remain unchanged. Back up the previous release before starting a newer server: old binaries cannot open a newer schema.
 
 ## Teams and workspaces
 
@@ -71,17 +76,64 @@ docker compose exec openqr npm run recover -- --email owner@example.com
 
 Use the same DATA_DIR and PUBLIC_URL as the running instance. Share the printed link privately with the account owner, who chooses their new password. Recovery links expire after 30 minutes, are stored only as hashes, work once, and replace earlier recovery links. A successful reset signs out every session and requires a new sign-in. Invitation and recovery secrets use URL fragments and are removed from the browser address bar after loading. An operator-issued link grants password-reset access: server/database access is a trusted administrative boundary.
 
-New and changed passwords use versioned scrypt with N=32768, r=8, p=3 and a random salt. Legacy hashes continue to verify until a password change or recovery. Email-address changes, self-service email recovery, two-factor authentication, and SSO are not implemented in v0.3.
+New and changed passwords use versioned scrypt with N=32768, r=8, p=3 and a random salt. Legacy hashes continue to verify until a password change or recovery. Email-address changes, self-service email recovery, two-factor authentication, and SSO are not implemented in v0.4.
 
 ## Designer and hosted pages
 
-The designer uses high error correction and preserves QR positioning and timing patterns. Logo uploads accept PNG/JPEG files up to 128 KB and 4 million pixels; the server validates and re-encodes them to a small PNG before storage. SVG uploads, remote logo URLs, and inverted/low-contrast designs are rejected. The code preview and exports share one SVG renderer.
+The designer uses high error correction, a four-module quiet zone, and protected positioning/timing patterns. Module styles are square, gapped, rounded, dots, vertical, horizontal, and connected. Outer and inner finders can be square, rounded, soft-circle, or leaf, with global or per-corner colors. Frames include outline, banner, pill, speech, ticket, and stamp. Choose caption position/size, add a logo or built-in symbol, and use undo/redo/reset before saving a reusable design.
 
-The test suite decodes all 27 combinations of the three module styles, three finder styles, and three frame styles. This is an automated check with representative content, not a guarantee for every printer or camera: test your final design at its intended print size.
+Colors must remain dark on a light background with at least 4.5:1 contrast, including customized finders. The preview, PNG, SVG, and ZIP exports share one vector renderer. Automated tests decode representative combinations, mixed corner styles, logos, symbols, and caption positions; test your final design at its intended print size on your target phones.
 
 The Docker image includes DejaVu fonts for PNG frame captions. Native Linux hosts also need an installed font family (for example, DejaVu Sans) for server-rendered captions.
 
-Choose **Link page** in the editor to build a mobile page hosted behind its permanent `/r/` link. The page is publicly accessible to anyone with the link while active, and visits count in analytics. Content is escaped and links must use HTTP(S). Deleting or pausing the code also makes its hosted page unavailable.
+### Media and publishing
+
+Upload PDF, PNG, or JPEG files up to **20 MB** in **Media library** or from the editor. The server checks actual content, rejects invalid/encrypted PDFs and active image formats, and re-encodes images with a 16-million-pixel input limit. Images are reduced to at most 1600 pixels; reusable logos become PNGs at most 128 pixels. Saved QR logos embed their sanitized bytes, so removing a library logo does not change a saved code. The direct design API still accepts embedded PNG/JPEG logos up to 128 KB and 4 million pixels.
+
+- **PDF:** title, description, cover, document metadata, reader, and download. Replace the selected file while retaining the permanent QR link. Direct mode skips the landing page and opens the reader.
+- **Digital contact:** portrait, organization/title, phone, email, website, address, and a downloadable vCard with escaped/folded text.
+- **Business:** cover, contact actions, map directions, weekly opening hours, and up to 12 extra links. Hours use the business's displayed local clock time; split/overnight hours are not supported yet.
+- **Social media:** up to 12 labeled links with platform icons, cover, and description.
+- New publishing pages include Minimal, Soft, and Bold themes, an accent color, optional attribution, and a landing-page preview. Existing link pages retain their original layout.
+
+The PDF reader uses locally bundled [Mozilla PDF.js](https://mozilla.github.io/pdf.js/) resources (Apache-2.0). It renders pages with bounded canvases, provides accessible extracted text, and does not enable embedded document scripts, interactive forms, or annotations. Scanned documents need the original download for OCR or other editing tools. There is no external viewer or CDN dependency.
+
+Files are workspace-private in the library. Attaching them to a published page intentionally makes them available to anyone who opens its active short link. Public file requests require a short-lived, code-bound ticket and current publication status. Pausing/expiring the code prevents future file requests; already downloaded copies remain with their recipients. A ticket lasts 15 minutes; reopening the QR page renews it. Reader/file requests do not add scans. A final allowed scan can still load its document after reaching the campaign cap.
+
+The server prevents deletion of files still referenced by a code. Replace/remove the file on every referencing page, then delete it from the library. Deleting a code leaves its library files available for reuse. Local media storage is for a single server with a persistent disk; object storage, galleries, audio/video, quotas, and malware scanning are future work.
+
+![Mobile PDF landing page](docs/publishing-mobile.jpg)
+
+## Backups and restore
+
+A running server creates its first database + media snapshot after 24 hours of uptime, then every 24 hours. Configure BACKUP_INTERVAL_HOURS (0 disables scheduling; maximum 576 hours) and BACKUP_RETENTION (default 7 archives). Manual backups work while the server runs:
+
+```sh
+npm run backup
+# Docker:
+docker compose exec openqr npm run backup
+```
+
+Use the same DATA_DIR and PUBLIC_URL as the server. Archives go to DATA_DIR/backups and include an online SQLite snapshot, every library file, and a checksum manifest. Media mutations coordinate with backup creation through a filesystem lock. Scheduling resumes from startup after a restart; use an external scheduler for calendar-based backups or frequently restarted instances.
+
+**Restore requires a stopped server.** With the same release installed and DATA_DIR configured:
+
+```sh
+npm run restore -- --archive /absolute/path/openqr-backup.tar.gz --confirm-stopped
+npm start
+```
+
+For Docker, stop the service, then use a one-off container with the existing data volume and the archive accessible in that volume:
+
+```sh
+docker compose stop openqr
+docker compose run --rm --no-deps openqr npm run restore -- --archive /app/data/backups/ARCHIVE.tar.gz --confirm-stopped
+docker compose up -d
+```
+
+Restore validates paths, entry types, checksums, SQLite integrity, schema compatibility, and media references before replacing data. Current database/media are preserved in DATA_DIR/restore-history. Archives are bounded to 10,000 entries and 1 GiB uncompressed by default; set RESTORE_MAX_BYTES explicitly for a larger trusted archive. Restore supports this release's schema, not automatic schema downgrades. Preserve the original PUBLIC_URL and DNS so printed links remain reachable.
+
+Backups contain account hashes, sessions, QR data, and published/private files. They are not encrypted by the app. Restrict access, copy archives off the server, and practice restoration; a same-disk backup does not protect against disk/server loss. Neither archive retention nor restore cleans older restore-history directories automatically.
 
 ## Campaigns and CSV workflows
 
@@ -158,6 +210,10 @@ server/manage.js   Operator-only recovery command
 server/codes.js     Migrations, codes, campaigns, templates and analytics
 server/design.js    Logo sanitization, SVG/PNG rendering
 server/pages.js     Safe public mobile pages
+server/storage.js   Workspace uploads, media validation and publishing migration
+server/publishing.js Page schemas and content validation
+server/backup.js    Snapshot archives, checksums, retention and offline restore
+scripts/pdf-assets.js Local PDF reader resource preparation
 server/payload.js   QR content validation and encoding
 server/index.js     Environment and process lifecycle
 test/               API and QR decoding tests

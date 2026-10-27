@@ -1,7 +1,7 @@
 import { ArrowRight, Bookmark, Palette, Trash2 } from "lucide-react";
 import { api, type DesignTemplate } from "../lib";
 import QrImage from "./QrImage";
-import { presets } from "./DesignControls";
+import { presets } from "./designPresets";
 export default function DesignStudio({
   canEdit,
   templates,

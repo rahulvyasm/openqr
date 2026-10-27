@@ -50,6 +50,8 @@ import {
 import "./styles.css";
 import "./advanced.css";
 import "./team.css";
+import "./publishing.css";
+import MediaLibrary from "./components/MediaLibrary";
 import AccessFlow, {
   readAccessLink,
   type AccessLink,
@@ -702,6 +704,14 @@ export default function App() {
             <span>Design studio</span>
             <span className="nav-new">NEW</span>
           </button>
+          <button
+            className={page === "media" ? "nav-item selected" : "nav-item"}
+            onClick={() => navigate("media")}
+          >
+            <Upload size={19} />
+            <span>Media library</span>
+            <span className="nav-new">NEW</span>
+          </button>
         </nav>
         <div className="nav-label folder-label">
           <span>FOLDERS</span>
@@ -788,11 +798,13 @@ export default function App() {
                 ? "Analytics"
                 : page === "designs"
                   ? "Design studio"
-                  : page === "settings"
-                    ? "Settings"
-                    : folder
-                      ? folders.find((f) => f.id === folder)?.name
-                      : "My QR codes"}
+                  : page === "media"
+                    ? "Media library"
+                    : page === "settings"
+                      ? "Settings"
+                      : folder
+                        ? folders.find((f) => f.id === folder)?.name
+                        : "My QR codes"}
             </strong>
           </div>
           <span className="topbar-open">
@@ -808,6 +820,8 @@ export default function App() {
                 Your account settings are always available.
               </p>
             </section>
+          ) : page === "media" ? (
+            <MediaLibrary key={auth.workspace?.id} canEdit={canEdit} />
           ) : page === "designs" ? (
             <DesignStudio
               canEdit={canEdit}

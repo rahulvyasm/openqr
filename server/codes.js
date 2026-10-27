@@ -4,10 +4,18 @@ import QRCode from "qrcode";
 import { zipSync, strToU8 } from "fflate";
 import { codeSchema, payload, destination } from "./payload.js";
 import { normalizeDesign, imageFor } from "./design.js";
-import { linksPage, unavailablePage } from "./pages.js";
+import { linksPage, hostedPage, unavailablePage } from "./pages.js";
+import { hostedTypes } from "./publishing.js";
+import { referencedAssets, validateAssetReferences } from "./storage.js";
+import {
+  availability,
+  publicTicket,
+  validPublicTicket,
+} from "./public-access.js";
+import { contactCard } from "../shared/contact.js";
 
 export function migrateCodes(db) {
-  if (db.prepare("PRAGMA user_version").get().user_version > 3)
+  if (db.prepare("PRAGMA user_version").get().user_version > 4)
     throw new Error(
       "This database belongs to a newer OpenQR release. Upgrade the server before opening it.",
     );
@@ -69,7 +77,7 @@ function transaction(db, fn) {
 const invalid = (message, status = 400) =>
   Object.assign(new Error(message), { status, domain: true });
 
-export function registerCodeRoutes(app, db, origin, analyticsSalt) {
+export function registerCodeRoutes(app, db, origin, analyticsSalt, storage) {
   const serialize = (row) => ({
     id: row.id,
     slug: row.slug,
@@ -85,6 +93,7 @@ export function registerCodeRoutes(app, db, origin, analyticsSalt) {
     shortUrl: `${origin}/r/${row.slug}`,
     design: JSON.parse(row.design || "{}"),
     campaign: JSON.parse(row.campaign || "{}"),
+    pageOptions: JSON.parse(row.page_options || "{}"),
   });
   const getCode = (id, workspaceId) =>
     db
@@ -135,12 +144,13 @@ export function registerCodeRoutes(app, db, origin, analyticsSalt) {
     return c;
   };
   const insert = (c, workspaceId, creatorId) => {
+    validateAssetReferences(db, c.data, workspaceId, c.type);
     const id = randomUUID(),
       slug = c.slug || randomBytes(8).toString("base64url");
     if (db.prepare("SELECT id FROM codes WHERE slug=?").get(slug))
       throw invalid("That short link is already taken. Choose another.", 409);
     db.prepare(
-      "INSERT INTO codes (id,user_id,slug,name,type,dynamic,data,folder_id,color,active,created_at,design,campaign,workspace_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+      "INSERT INTO codes (id,user_id,slug,name,type,dynamic,data,folder_id,color,active,created_at,design,campaign,workspace_id,page_options) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
     ).run(
       id,
       creatorId,
@@ -156,6 +166,7 @@ export function registerCodeRoutes(app, db, origin, analyticsSalt) {
       JSON.stringify(c.design),
       JSON.stringify(c.campaign),
       workspaceId,
+      JSON.stringify(c.pageOptions || {}),
     );
     return serialize(getCode(id, workspaceId));
   };
@@ -171,8 +182,11 @@ export function registerCodeRoutes(app, db, origin, analyticsSalt) {
   );
   app.post("/api/codes", async (req, res) => {
     const c = await validate(req.body, req.workspace.id);
-    req.assertEdit();
-    res.status(201).json(insert(c, req.workspace.id, req.user.id));
+    const result = await storage.exclusive(() => {
+      req.assertEdit();
+      return insert(c, req.workspace.id, req.user.id);
+    });
+    res.status(201).json(result);
   });
   app.post("/api/codes/bulk", async (req, res) => {
     const input = z
@@ -207,10 +221,12 @@ export function registerCodeRoutes(app, db, origin, analyticsSalt) {
         );
       }
     }
-    req.assertEdit();
-    const result = transaction(db, () =>
-      codes.map((c) => insert(c, req.workspace.id, req.user.id)),
-    );
+    const result = await storage.exclusive(() => {
+      req.assertEdit();
+      return transaction(db, () =>
+        codes.map((c) => insert(c, req.workspace.id, req.user.id)),
+      );
+    });
     res.status(201).json(result);
   });
   app.post("/api/codes/batch", (req, res) => {
@@ -296,13 +312,17 @@ export function registerCodeRoutes(app, db, origin, analyticsSalt) {
       .type("application/zip")
       .send(Buffer.from(zipSync(files)));
   });
-  app.post("/api/codes/:id/duplicate", (req, res) => {
+  app.post("/api/codes/:id/duplicate", async (req, res) => {
     const row = getCode(req.params.id, req.workspace.id);
     if (!row) throw invalid("QR code not found.", 404);
     const copy = serialize(row);
     delete copy.slug;
     copy.name = `${copy.name.slice(0, 93)} (copy)`;
-    res.status(201).json(insert(copy, req.workspace.id, req.user.id));
+    const result = await storage.exclusive(() => {
+      req.assertEdit();
+      return insert(copy, req.workspace.id, req.user.id);
+    });
+    res.status(201).json(result);
   });
   app.put("/api/codes/:id", async (req, res) => {
     const old = getCode(req.params.id, req.workspace.id);
@@ -316,20 +336,26 @@ export function registerCodeRoutes(app, db, origin, analyticsSalt) {
       );
     if (!old.dynamic && payload(c) !== payload(serialize(old)))
       throw invalid("Static QR content cannot be edited. Create a new code.");
-    req.assertEdit();
-    db.prepare(
-      "UPDATE codes SET name=?,data=?,folder_id=?,color=?,active=?,design=?,campaign=? WHERE id=? AND workspace_id=?",
-    ).run(
-      c.name,
-      JSON.stringify(c.data),
-      c.folderId,
-      c.color,
-      +c.active,
-      JSON.stringify(c.design),
-      JSON.stringify(c.campaign),
-      old.id,
-      req.workspace.id,
-    );
+    await storage.exclusive(() => {
+      req.assertEdit();
+      if (!getCode(old.id, req.workspace.id))
+        throw invalid("QR code not found.", 404);
+      validateAssetReferences(db, c.data, req.workspace.id, c.type);
+      db.prepare(
+        "UPDATE codes SET name=?,data=?,folder_id=?,color=?,active=?,design=?,campaign=?,page_options=? WHERE id=? AND workspace_id=?",
+      ).run(
+        c.name,
+        JSON.stringify(c.data),
+        c.folderId,
+        c.color,
+        +c.active,
+        JSON.stringify(c.design),
+        JSON.stringify(c.campaign),
+        JSON.stringify(c.pageOptions),
+        old.id,
+        req.workspace.id,
+      );
+    });
     res.json(serialize(getCode(old.id, req.workspace.id)));
   });
   app.delete("/api/codes/:id", (req, res) => {
@@ -479,26 +505,8 @@ export function registerCodeRoutes(app, db, origin, analyticsSalt) {
         return { status: 404, message: "This QR code could not be found." };
       const c = serialize(row),
         now = new Date().toISOString();
-      if (!c.active)
-        return { status: 410, message: "This QR code is currently paused." };
-      if (
-        c.campaign.startsAt &&
-        now < new Date(c.campaign.startsAt).toISOString()
-      )
-        return {
-          status: 423,
-          message: "This campaign has not started yet. Please try again later.",
-        };
-      if (
-        c.campaign.expiresAt &&
-        now >= new Date(c.campaign.expiresAt).toISOString()
-      )
-        return { status: 410, message: "This campaign has ended." };
-      if (c.campaign.scanLimit && row.scans >= c.campaign.scanLimit)
-        return {
-          status: 410,
-          message: "This campaign has reached its scan limit.",
-        };
+      const blocked = availability(c);
+      if (blocked) return blocked;
       if (req.method === "GET") {
         const ua = req.get("user-agent") || "";
         const device = /iPad|Tablet/i.test(ua)
@@ -550,6 +558,99 @@ export function registerCodeRoutes(app, db, origin, analyticsSalt) {
         .send(unavailablePage(result.message));
     if (result.code.type === "links")
       return res.type("html").send(linksPage(result.code));
+    if (hostedTypes.includes(result.code.type)) {
+      const c = result.code,
+        ticket = publicTicket(c.id, analyticsSalt);
+      if (c.type === "pdf" && c.data.direct === "true")
+        return res.redirect(
+          302,
+          `/view/${encodeURIComponent(c.slug)}/${encodeURIComponent(c.data.pdfId)}?ticket=${encodeURIComponent(ticket)}`,
+        );
+      const assets = referencedAssets(c.data)
+        .map((id) =>
+          db
+            .prepare("SELECT * FROM assets WHERE id=? AND workspace_id=?")
+            .get(id, rowWorkspace(c.id)),
+        )
+        .filter(Boolean);
+      return res.type("html").send(hostedPage(c, assets, ticket));
+    }
     res.redirect(302, destination(result.code));
+  });
+  function rowWorkspace(id) {
+    return db.prepare("SELECT workspace_id FROM codes WHERE id=?").get(id)
+      .workspace_id;
+  }
+  function publicCode(req) {
+    const row = db
+      .prepare(
+        "SELECT c.*,(SELECT COUNT(*) FROM scans WHERE code_id=c.id) AS scans FROM codes c WHERE c.slug=? AND c.dynamic=1",
+      )
+      .get(req.params.slug);
+    if (!row) throw invalid("QR page not found.", 404);
+    const code = serialize(row);
+    if (!validPublicTicket(req.query.ticket, code.id, analyticsSalt))
+      throw invalid("Open this QR page again to access its files.", 403);
+    const blocked = availability(code, { ignoreCap: true });
+    if (blocked) throw invalid(blocked.message, blocked.status);
+    return { code, workspaceId: row.workspace_id };
+  }
+  app.get("/r/:slug/media/:id", (req, res, next) => {
+    res.set({
+      "Cache-Control": "no-store",
+      "X-Robots-Tag": "noindex, nofollow",
+      "Referrer-Policy": "no-referrer",
+    });
+    const { code, workspaceId } = publicCode(req);
+    if (
+      !hostedTypes.includes(code.type) ||
+      !referencedAssets(code.data).includes(req.params.id)
+    )
+      throw invalid("File not found.", 404);
+    const asset = db
+      .prepare("SELECT * FROM assets WHERE id=? AND workspace_id=?")
+      .get(req.params.id, workspaceId);
+    if (!asset) throw invalid("File not found.", 404);
+    res.type(asset.mime).set("X-Content-Type-Options", "nosniff");
+    if (asset.kind === "pdf") {
+      res.attachment(asset.name.replace(/\.[^.]+$/, "") + ".pdf");
+      if (req.query.inline === "1")
+        res.set(
+          "Content-Disposition",
+          res.get("Content-Disposition").replace(/^attachment/, "inline"),
+        );
+      res.set("Content-Security-Policy", "sandbox; default-src 'none'");
+    }
+    res.sendFile(storage.filePath(asset.storage_key), (error) => {
+      if (error) next(error);
+    });
+  });
+  app.get("/r/:slug/contact.vcf", (req, res) => {
+    const { code } = publicCode(req);
+    if (code.type !== "contact") throw invalid("Contact not found.", 404);
+    res
+      .set({ "Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow" })
+      .attachment("contact.vcf")
+      .type("text/vcard")
+      .send(contactCard(code.data));
+  });
+  app.get("/r/:slug/document/:id", (req, res) => {
+    const { code, workspaceId } = publicCode(req);
+    if (code.type !== "pdf" || code.data.pdfId !== req.params.id)
+      throw invalid("Document not found.", 404);
+    const asset = db
+      .prepare(
+        "SELECT name,pages FROM assets WHERE id=? AND workspace_id=? AND kind='pdf'",
+      )
+      .get(req.params.id, workspaceId);
+    if (!asset) throw invalid("Document not found.", 404);
+    res
+      .set({ "Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow" })
+      .json({
+        title: code.data.title,
+        name: asset.name,
+        pages: asset.pages,
+        downloadUrl: `/r/${encodeURIComponent(code.slug)}/media/${encodeURIComponent(req.params.id)}?ticket=${encodeURIComponent(req.query.ticket)}`,
+      });
   });
 }

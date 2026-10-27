@@ -12,7 +12,33 @@ export type CodeType =
   | "whatsapp"
   | "location"
   | "event"
-  | "links";
+  | "links"
+  | "pdf"
+  | "contact"
+  | "business"
+  | "social";
+export type PageOptions = {
+  theme: "minimal" | "soft" | "bold";
+  accent: string;
+  showBrand: boolean;
+};
+export const defaultPageOptions: PageOptions = {
+  theme: "soft",
+  accent: "#285b48",
+  showBrand: true,
+};
+export const isHosted = (type: CodeType) =>
+  ["links", "pdf", "contact", "business", "social"].includes(type);
+export type Asset = {
+  id: string;
+  name: string;
+  kind: "pdf" | "image" | "logo";
+  mime: string;
+  size: number;
+  pages: number | null;
+  createdAt: string;
+  url: string;
+};
 export type Campaign = {
   startsAt: string | null;
   expiresAt: string | null;
@@ -42,6 +68,7 @@ export type Code = {
   shortUrl: string;
   design: QRDesign;
   campaign: Campaign;
+  pageOptions: PageOptions;
 };
 export type Folder = { id: string; name: string };
 export type User = { id: string; name: string; email: string };
@@ -109,6 +136,10 @@ export const typeNames: Record<CodeType, string> = {
   location: "Location",
   event: "Event",
   links: "Link page",
+  pdf: "PDF",
+  contact: "Digital contact",
+  business: "Business page",
+  social: "Social media",
 };
 export function codeContent(
   code: Pick<Code, "type" | "data" | "dynamic" | "shortUrl">,
@@ -148,6 +179,10 @@ export function codeContent(
       return calendarEvent(d);
     }
     case "links":
+    case "pdf":
+    case "contact":
+    case "business":
+    case "social":
       return code.shortUrl;
   }
 }

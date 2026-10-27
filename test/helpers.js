@@ -3,13 +3,17 @@ import { once } from "node:events";
 import { createApp } from "../server/app.js";
 
 export async function fixture(t, dbPath = ":memory:") {
-  const { app, db } = createApp({ dbPath, publicUrl: "http://localhost:5173" });
+  const { app, db, storage } = createApp({
+    dbPath,
+    publicUrl: "http://localhost:5173",
+  });
   const server = app.listen(0, "127.0.0.1");
   await once(server, "listening");
   const base = `http://127.0.0.1:${server.address().port}`;
   t.after(async () => {
     await new Promise((r) => server.close(r));
     db.close();
+    await storage.dispose();
   });
   let cookie = "";
   async function request(
@@ -17,6 +21,7 @@ export async function fixture(t, dbPath = ":memory:") {
     {
       method = "GET",
       body,
+      raw,
       origin = "http://localhost:5173",
       authenticated = true,
       headers = {},
@@ -30,7 +35,7 @@ export async function fixture(t, dbPath = ":memory:") {
         ...(body ? { "content-type": "application/json" } : {}),
         ...headers,
       },
-      body: body ? JSON.stringify(body) : undefined,
+      body: raw ?? (body ? JSON.stringify(body) : undefined),
       redirect: "manual",
     });
     if (res.headers.has("set-cookie"))
@@ -49,7 +54,7 @@ export async function fixture(t, dbPath = ":memory:") {
     assert.equal(res.status, 201);
     return res;
   }
-  return { request, setup, db, base };
+  return { request, setup, db, base, storage };
 }
 export const urlCode = (extra = {}) => ({
   name: "My website",

@@ -1,6 +1,11 @@
 import { calendarEvent } from "../shared/calendar.js";
 import { z } from "zod";
 import { designSchema } from "./design.js";
+import {
+  hostedTypes,
+  pageOptionsSchema,
+  validateHosted,
+} from "./publishing.js";
 
 const text = (max = 1000) => z.string().trim().max(max);
 export const codeSchema = z.object({
@@ -17,6 +22,10 @@ export const codeSchema = z.object({
     "location",
     "event",
     "links",
+    "pdf",
+    "contact",
+    "business",
+    "social",
   ]),
   dynamic: z.boolean().default(false),
   data: z.record(z.string(), z.string().max(6000)),
@@ -31,6 +40,7 @@ export const codeSchema = z.object({
     .regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]{2,59}$/)
     .optional(),
   design: designSchema,
+  pageOptions: pageOptionsSchema,
   campaign: z
     .object({
       startsAt: z.iso.datetime({ offset: true }).nullable().default(null),
@@ -59,8 +69,12 @@ const escape = (s = "") =>
   s.replace(/([\\;,:])/g, "\\$1").replace(/\r?\n/g, "\\n");
 export function payload(code) {
   const d = code.data;
-  if (code.dynamic && !["url", "links"].includes(code.type))
-    throw new Error("Only website and link-page codes support dynamic links.");
+  if (code.dynamic && !["url", ...hostedTypes].includes(code.type))
+    throw new Error(
+      "Only website and hosted-page codes support dynamic links.",
+    );
+  if (["pdf", "contact", "business", "social"].includes(code.type))
+    return validateHosted(code);
   if (code.type === "links" && !code.dynamic)
     throw new Error("Use a dynamic code for a hosted link page.");
   switch (code.type) {
