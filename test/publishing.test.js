@@ -712,13 +712,13 @@ test("v0.3 databases migrate to publishing without changing sessions or existing
   await setup();
   const code = await create(request, "url", { url: "https://example.com" });
   db.exec(
-    "DROP TABLE assets; ALTER TABLE codes DROP COLUMN page_options; PRAGMA user_version=3;",
+    "DROP TABLE page_templates; DROP TABLE assets; ALTER TABLE codes DROP COLUMN page_options; PRAGMA user_version=3;",
   );
   const migrated = createApp({ dbPath: path });
   try {
     assert.equal(
       migrated.db.prepare("PRAGMA user_version").get().user_version,
-      4,
+      5,
     );
     assert.equal(
       migrated.db.prepare("SELECT slug FROM codes WHERE id=?").get(code.id)

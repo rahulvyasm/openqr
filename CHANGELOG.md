@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.5.0 — 2026-10-27
+
+- Add image gallery pages (1–24 images) with drag/arrow reordering, captions, alternative text, optional downloads, and a mobile photo grid or full-width layout.
+- Add audio and video pages with in-page players, cover artwork, descriptions, optional downloads, and byte-range seeking. Uploads are content-verified and their duration/dimensions are read from the file.
+- Add hosted event pages with venue, time zone, registration link, and a stable downloadable calendar entry; and app-store routing that opens the right store for iOS/Android with a website fallback (or a landing page).
+- Add reusable page templates and page styling (layout, fonts, corners, buttons, accent color) shared by the collection editors.
+- Add per-workspace storage quotas, bounded uploads (`MAX_UPLOAD_MB`, `WORKSPACE_STORAGE_MB`), optional private S3-compatible media storage, remote backup copies, and `npm run storage:sync` for moving existing media off local disk.
+- Add `/health/live` and `/health/ready` endpoints.
+- Test real MP3/MP4/WebM files, gallery ordering, range requests, event calendars, app routing fallbacks, storage limits, and S3 read/write/delete/backup against a local S3-compatible service.
+
 ## 0.4.0 — 2026-10-27
 
 - Add PDF publishing and a self-hosted PDF.js reader with page navigation, zoom, extracted text, and downloads. Replacing documents preserves printed QR links.

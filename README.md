@@ -10,12 +10,12 @@ This is an independent implementation. It does not reuse QR Code Generator's cod
 
 _Dashboard from a disposable test workspace. Your instance starts empty._
 
-## What's included in v0.4
+## What's included in v0.5
 
 - Account setup, invite-based team signup, password updates, operator-managed recovery, session management, and profile settings.
 - Workspaces with Owner, Admin, Editor, and Viewer roles enforced by the server across codes, exports, folders, designs, analytics, and team administration.
 - Single-use invitations, expiry, renewal, revocation, password-confirmed ownership transfer, and a workspace security activity log.
-- Fifteen QR types: website, plain text, Wi-Fi, email, phone, vCard, SMS, WhatsApp, location, calendar event, link page, PDF, digital contact, business page, and social media.
+- Twenty QR types: website, plain text, Wi-Fi, email, phone, vCard, SMS, WhatsApp, location, calendar event, link page, PDF, digital contact, business page, social media, image gallery, audio, video, hosted event page, and app stores.
 - Dynamic website codes: change destinations without changing the printed QR; pause and resume links.
 - Static codes: content lives directly in the QR and does not depend on the server.
 - A three-step editor with visual galleries: seven module styles, four finder styles, independent inner/outer and per-corner styles/colors, seven frame choices, top/bottom captions, logo sizing, built-in symbols, and undo/redo/reset. Preview and downloads share one renderer.
@@ -28,6 +28,8 @@ _Dashboard from a disposable test workspace. Your instance starts empty._
 - Real redirect analytics: daily scans, approximate daily unique visitors, devices, browsers, operating systems, referrer hosts, top codes, and CSV exports for 7/30/90-day ranges.
 - Workspace media library for PDFs, portraits, cover images, and reusable logos. PDF.js reader with page navigation, zoom, text extraction, and downloads.
 - Themed digital contact cards with vCard downloads, business pages with hours/directions, and social pages with platform links.
+- Image galleries with reordering and captions, audio/video players with seeking, hosted event pages with calendar downloads, and device-aware app-store routing with a web fallback. Reusable page templates share layout and styling across these pages.
+- Per-workspace storage quotas, bounded uploads, optional private S3-compatible media storage, and off-server backup copies.
 - Database + media snapshot backups, automatic retention, checksum validation, and offline restore with preservation of previous data.
 - SQLite persistence, self-hosted fonts/PDF resources, responsive layouts, Docker configuration, and GitHub Actions checks.
 
@@ -100,7 +102,7 @@ The PDF reader uses locally bundled [Mozilla PDF.js](https://mozilla.github.io/p
 
 Files are workspace-private in the library. Attaching them to a published page intentionally makes them available to anyone who opens its active short link. Public file requests require a short-lived, code-bound ticket and current publication status. Pausing/expiring the code prevents future file requests; already downloaded copies remain with their recipients. A ticket lasts 15 minutes; reopening the QR page renews it. Reader/file requests do not add scans. A final allowed scan can still load its document after reaching the campaign cap.
 
-The server prevents deletion of files still referenced by a code. Replace/remove the file on every referencing page, then delete it from the library. Deleting a code leaves its library files available for reuse. Local media storage is for a single server with a persistent disk; object storage, galleries, audio/video, quotas, and malware scanning are future work.
+The server prevents deletion of files still referenced by a code. Replace/remove the file on every referencing page, then delete it from the library. Deleting a code leaves its library files available for reuse. Media lives on the server's persistent disk by default. Set `S3_BUCKET` (plus `S3_ENDPOINT`, `S3_REGION`, `S3_FORCE_PATH_STYLE` as needed) to store it privately in S3-compatible storage, and `S3_BACKUP_BUCKET` to copy backups off the server. Stop OpenQR and run `npm run storage:sync -- --confirm-stopped` to move existing local files (add `--prune-local` to remove verified local copies). `WORKSPACE_STORAGE_MB` (default 1024) and `MAX_UPLOAD_MB` (default 100, max 500) bound usage. Malware scanning is future work.
 
 ![Mobile PDF landing page](docs/publishing-mobile.jpg)
 

@@ -16,28 +16,69 @@ export type CodeType =
   | "pdf"
   | "contact"
   | "business"
-  | "social";
+  | "social"
+  | "gallery"
+  | "audio"
+  | "video"
+  | "hosted-event"
+  | "app";
 export type PageOptions = {
   theme: "minimal" | "soft" | "bold";
   accent: string;
   showBrand: boolean;
+  layout: "card" | "editorial" | "compact";
+  font: "modern" | "serif";
+  corners: "rounded" | "square";
+  buttonStyle: "outline" | "solid";
+  galleryLayout: "grid" | "stack";
 };
 export const defaultPageOptions: PageOptions = {
   theme: "soft",
   accent: "#285b48",
   showBrand: true,
+  layout: "card",
+  font: "modern",
+  corners: "rounded",
+  buttonStyle: "outline",
+  galleryLayout: "grid",
 };
 export const isHosted = (type: CodeType) =>
-  ["links", "pdf", "contact", "business", "social"].includes(type);
+  [
+    "links",
+    "pdf",
+    "contact",
+    "business",
+    "social",
+    "gallery",
+    "audio",
+    "video",
+    "hosted-event",
+    "app",
+  ].includes(type);
+export const hasPublishingPage = (type: CodeType) =>
+  isHosted(type) && type !== "links";
+export type PageTemplate = {
+  id: string;
+  name: string;
+  type: CodeType;
+  data: Record<string, string>;
+  pageOptions: PageOptions;
+};
 export type Asset = {
   id: string;
   name: string;
-  kind: "pdf" | "image" | "logo";
+  kind: "pdf" | "image" | "logo" | "audio" | "video";
   mime: string;
   size: number;
   pages: number | null;
   createdAt: string;
   url: string;
+  metadata: {
+    duration?: number;
+    width?: number;
+    height?: number;
+    codec?: string;
+  };
 };
 export type Campaign = {
   startsAt: string | null;
@@ -140,6 +181,11 @@ export const typeNames: Record<CodeType, string> = {
   contact: "Digital contact",
   business: "Business page",
   social: "Social media",
+  gallery: "Image gallery",
+  audio: "Audio",
+  video: "Video",
+  "hosted-event": "Event page",
+  app: "App stores",
 };
 export function codeContent(
   code: Pick<Code, "type" | "data" | "dynamic" | "shortUrl">,
@@ -183,6 +229,11 @@ export function codeContent(
     case "contact":
     case "business":
     case "social":
+    case "gallery":
+    case "audio":
+    case "video":
+    case "hosted-event":
+    case "app":
       return code.shortUrl;
   }
 }

@@ -2,12 +2,18 @@ import { useEffect, useState } from "react";
 import { ImagePlus, FileText, Plus, Trash2, X } from "lucide-react";
 import { api, type Asset, type CodeType, type PageOptions } from "../lib";
 import { AssetPicker } from "./MediaLibrary";
+import CollectionFields, { CollectionPreview } from "./CollectionFields";
+import PageTemplates from "./PageTemplates";
 type Props = {
   type: CodeType;
   data: Record<string, string>;
   onData: (key: string, value: string) => void;
   options: PageOptions;
   onOptions: (options: PageOptions) => void;
+  onApplyTemplate?: (
+    data: Record<string, string>,
+    options: PageOptions,
+  ) => void;
 };
 const platforms = [
   "website",
@@ -25,6 +31,7 @@ export default function PublishingFields({
   onData,
   options,
   onOptions,
+  onApplyTemplate,
 }: Props) {
   const [picker, setPicker] = useState<
       "pdfId" | "portraitId" | "coverId" | null
@@ -34,9 +41,15 @@ export default function PublishingFields({
     api<Asset[]>("/assets")
       .then(setAssets)
       .catch(() => {});
+  let galleryKey = "";
+  try {
+    galleryKey = JSON.parse(data.items || "[]")
+      .map((item: { assetId: string }) => item.assetId)
+      .join(",");
+  } catch {}
   useEffect(() => {
     void load();
-  }, []);
+  }, [data.mediaId, galleryKey]);
   const field = (
     key: string,
     label: string,
@@ -130,6 +143,13 @@ export default function PublishingFields({
     );
   return (
     <div className="publishing-fields">
+      <PageTemplates
+        type={type}
+        data={data}
+        options={options}
+        onOptions={onOptions}
+        onApply={(t) => onApplyTemplate?.(t.data, t.pageOptions)}
+      />
       {type === "contact" ? (
         <>
           {field("fullName", "Full name", "text", true)}
@@ -180,6 +200,14 @@ export default function PublishingFields({
           {field("website", "Website", "url")}
           {field("address", "Address")}
         </>
+      )}
+      {["gallery", "audio", "video", "hosted-event", "app"].includes(type) && (
+        <CollectionFields
+          type={type}
+          data={data}
+          onData={onData}
+          assets={assets}
+        />
       )}
       {media(
         type === "contact" ? "portraitId" : "coverId",
@@ -313,6 +341,86 @@ export default function PublishingFields({
       )}
       <fieldset className="page-theme">
         <legend>Make the page yours</legend>
+        <div className="field-pair">
+          <label>
+            Page layout
+            <select
+              value={options.layout}
+              onChange={(e) =>
+                onOptions({
+                  ...options,
+                  layout: e.target.value as PageOptions["layout"],
+                })
+              }
+            >
+              <option value="card">Card</option>
+              <option value="editorial">Editorial</option>
+              <option value="compact">Compact</option>
+            </select>
+          </label>
+          <label>
+            Heading font
+            <select
+              value={options.font}
+              onChange={(e) =>
+                onOptions({
+                  ...options,
+                  font: e.target.value as PageOptions["font"],
+                })
+              }
+            >
+              <option value="modern">Modern</option>
+              <option value="serif">Serif</option>
+            </select>
+          </label>
+          <label>
+            Page corners
+            <select
+              value={options.corners}
+              onChange={(e) =>
+                onOptions({
+                  ...options,
+                  corners: e.target.value as PageOptions["corners"],
+                })
+              }
+            >
+              <option value="rounded">Rounded</option>
+              <option value="square">Square</option>
+            </select>
+          </label>
+          <label>
+            Button style
+            <select
+              value={options.buttonStyle}
+              onChange={(e) =>
+                onOptions({
+                  ...options,
+                  buttonStyle: e.target.value as PageOptions["buttonStyle"],
+                })
+              }
+            >
+              <option value="outline">Outline</option>
+              <option value="solid">Solid</option>
+            </select>
+          </label>
+        </div>
+        {type === "gallery" && (
+          <label>
+            Gallery layout
+            <select
+              value={options.galleryLayout}
+              onChange={(e) =>
+                onOptions({
+                  ...options,
+                  galleryLayout: e.target.value as PageOptions["galleryLayout"],
+                })
+              }
+            >
+              <option value="grid">Photo grid</option>
+              <option value="stack">Full-width photos</option>
+            </select>
+          </label>
+        )}
         <div className="page-theme-options">
           {(["minimal", "soft", "bold"] as const).map((t) => (
             <button
@@ -377,11 +485,17 @@ export function PagePreview({
   options,
 }: Pick<Props, "type" | "data" | "options">) {
   const [assets, setAssets] = useState<Asset[]>([]);
+  let galleryKey = "";
+  try {
+    galleryKey = JSON.parse(data.items || "[]")
+      .map((item: { assetId: string }) => item.assetId)
+      .join(",");
+  } catch {}
   useEffect(() => {
     api<Asset[]>("/assets")
       .then(setAssets)
       .catch(() => {});
-  }, [data.coverId, data.portraitId, data.pdfId]);
+  }, [data.coverId, data.portraitId, data.pdfId, data.mediaId, galleryKey]);
   const cover = assets.find((a) => a.id === data.coverId),
     portrait = assets.find((a) => a.id === data.portraitId),
     pdf = assets.find((a) => a.id === data.pdfId);
@@ -393,7 +507,7 @@ export function PagePreview({
   } catch {}
   return (
     <div
-      className={`page-live-preview theme-${options.theme}`}
+      className={`page-live-preview theme-${options.theme} layout-${options.layout} font-${options.font} corners-${options.corners} buttons-${options.buttonStyle} gallery-${options.galleryLayout}`}
       style={{ "--page-accent": options.accent } as React.CSSProperties}
     >
       <span className="small-label">LANDING PAGE PREVIEW</span>
@@ -420,6 +534,7 @@ export function PagePreview({
             </small>
           )}
           <p>{data.description || "Your story starts with a scan."}</p>
+          <CollectionPreview type={type} data={data} assets={assets} />
           {type === "pdf" && (
             <>
               <div className="phone-document">

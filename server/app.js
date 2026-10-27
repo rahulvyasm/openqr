@@ -14,6 +14,7 @@ import { access, problem } from "./security.js";
 import {
   createStorage,
   migratePublishing,
+  migrateCollections,
   registerAssetRoutes,
 } from "./storage.js";
 
@@ -23,6 +24,7 @@ export function createApp({
   secureCookie = false,
   trustProxy = false,
   storageDir,
+  storageOptions = {},
 } = {}) {
   const origin = new URL(publicUrl).origin;
   if (!dbPath) {
@@ -43,6 +45,7 @@ export function createApp({
     migrateCodes(db);
     migrateWorkspaces(db);
     migratePublishing(db);
+    migrateCollections(db);
   } catch (error) {
     db.close();
     throw error;
@@ -60,8 +63,19 @@ export function createApp({
       (dbPath === ":memory:"
         ? undefined
         : join(dirname(resolve(dbPath)), "media")),
+    storageOptions,
   );
   app.disable("x-powered-by");
+  app.get("/health/live", (_req, res) => res.json({ status: "ok" }));
+  app.get("/health/ready", async (_req, res) => {
+    try {
+      db.prepare("SELECT 1").get();
+      await storage.ready();
+      res.json({ status: "ready" });
+    } catch {
+      res.status(503).json({ status: "unavailable" });
+    }
+  });
   if (trustProxy) app.set("trust proxy", 1);
   app.use(
     helmet({

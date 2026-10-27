@@ -51,6 +51,7 @@ import "./styles.css";
 import "./advanced.css";
 import "./team.css";
 import "./publishing.css";
+import "./collections.css";
 import MediaLibrary from "./components/MediaLibrary";
 import AccessFlow, {
   readAccessLink,

@@ -90,6 +90,7 @@ test("viewers can read and export but cannot mutate any shared resource", async 
     "/api/templates",
     "/api/analytics",
     "/api/team",
+    '/api/assets','/api/storage','/api/page-templates',
     `/api/codes/${saved.id}/download?format=svg`,
   ])
     assert.equal((await viewer(path)).status, 200, path);
@@ -117,6 +118,10 @@ test("viewers can read and export but cannot mutate any shared resource", async 
       { email: "other@example.com", role: "viewer" },
     ],
     ["/api/workspace", "PATCH", { name: "Forbidden" }],
+    ['/api/page-templates','POST',{name:'Forbidden'}],
+    ['/api/page-templates/not-owned','DELETE',undefined],
+    ['/api/assets','POST',{}],
+    ['/api/assets/not-owned','DELETE',undefined],
   ])
     assert.equal((await viewer(path, { method, body })).status, 403, path);
   assert.equal((await viewer("/api/audit")).status, 403);

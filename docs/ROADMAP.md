@@ -47,7 +47,7 @@ Acceptance: restoring a backup preserves printed links, workspace memberships, a
 
 ## Then: publishing and integrations
 
-- Expand publishing to image galleries, restaurant menus, app-store routing, audio/video, and richer page templates. Add an object-storage adapter, storage quotas, and retention controls to the existing bounded uploads.
+- Add restaurant menus and more page templates. Galleries, audio/video, events, app-store routing, S3-compatible storage, and quotas shipped in v0.5; retention controls and malware scanning remain.
 - Custom domains with verified ownership, certificate status, domain-to-workspace mapping, and protection against domain takeover. Existing domains must remain routable when codes are edited.
 - Scoped, revocable API keys, published API documentation, per-key rate limits, and idempotent creation for integrations.
 - Background jobs for larger imports/exports with progress, cancellation, resumability, and worker concurrency limits.
@@ -75,4 +75,4 @@ Keep the repository's chosen visibility. Ship source changes only after tests an
 
 ## Remaining screenshot parity
 
-The supplied QRCG screens also show hosted events, galleries, audio/video, coupons, feedback/ratings, app routing, and GS1 2D barcodes. These are still future work. GS1 needs standards-based identifier validation and Digital Link behavior; it is not a renamed URL code. Interactive pages need response storage, moderation, abuse controls, and deletion/export rules.
+The supplied QRCG screens also show coupons, feedback/ratings, and GS1 2D barcodes (hosted events, galleries, audio/video, and app routing shipped in v0.5). These are still future work. GS1 needs standards-based identifier validation and Digital Link behavior; it is not a renamed URL code. Interactive pages need response storage, moderation, abuse controls, and deletion/export rules.

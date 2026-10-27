@@ -1,6 +1,14 @@
 import { z } from "zod";
 import { problem } from "./security.js";
-export const hostedTypes = ["links", "pdf", "contact", "business", "social"];
+import { collectionTypes, validateCollection } from "./collections.js";
+export const hostedTypes = [
+  "links",
+  "pdf",
+  "contact",
+  "business",
+  "social",
+  ...collectionTypes,
+];
 export const pageOptionsSchema = z
   .object({
     theme: z.enum(["minimal", "soft", "bold"]).default("soft"),
@@ -9,8 +17,22 @@ export const pageOptionsSchema = z
       .regex(/^#[0-9a-f]{6}$/i)
       .default("#285b48"),
     showBrand: z.boolean().default(true),
+    layout: z.enum(["card", "editorial", "compact"]).default("card"),
+    font: z.enum(["modern", "serif"]).default("modern"),
+    corners: z.enum(["rounded", "square"]).default("rounded"),
+    buttonStyle: z.enum(["outline", "solid"]).default("outline"),
+    galleryLayout: z.enum(["grid", "stack"]).default("grid"),
   })
-  .default({ theme: "soft", accent: "#285b48", showBrand: true });
+  .default({
+    theme: "soft",
+    accent: "#285b48",
+    showBrand: true,
+    layout: "card",
+    font: "modern",
+    corners: "rounded",
+    buttonStyle: "outline",
+    galleryLayout: "grid",
+  });
 export function safeWebsite(value) {
   let url;
   try {
@@ -27,6 +49,7 @@ export function safeWebsite(value) {
   return url.href;
 }
 export function validateHosted(code) {
+  if (collectionTypes.includes(code.type)) return validateCollection(code);
   const d = code.data;
   if (["contact", "business"].includes(code.type) && d.website)
     safeWebsite(d.website);

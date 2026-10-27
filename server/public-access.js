@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
-export function publicTicket(codeId, secret) {
-  const expires = Date.now() + 15 * 60000;
+export function publicTicket(codeId, secret, minutes = 15) {
+  const expires = Date.now() + Math.min(25 * 60, Math.max(1, minutes)) * 60000;
   return `${expires}.${createHmac("sha256", secret).update(`${codeId}|${expires}`).digest("hex")}`;
 }
 export function validPublicTicket(token, codeId, secret) {
@@ -9,7 +9,7 @@ export function validPublicTicket(token, codeId, secret) {
   const [expires, mac] = token.split(".");
   if (
     Number(expires) <= Date.now() ||
-    Number(expires) > Date.now() + 16 * 60000
+    Number(expires) > Date.now() + 25 * 60 * 60000 + 60000
   )
     return false;
   return timingSafeEqual(

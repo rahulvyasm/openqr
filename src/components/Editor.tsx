@@ -27,6 +27,7 @@ import {
   type Campaign,
   defaultPageOptions,
   isHosted,
+  hasPublishingPage,
 } from "../lib";
 import { defaultDesign } from "../../shared/qr.js";
 import Modal from "./Modal";
@@ -69,13 +70,9 @@ export default function Editor({
     [dynamic, setDynamic] = useState(code?.dynamic ?? true),
     [name, setName] = useState(code?.name || "");
   const [preview, setPreview] = useState<"qr" | "page">(
-    code && ["pdf", "contact", "business", "social"].includes(code.type)
-      ? "page"
-      : "qr",
+    code && hasPublishingPage(code.type) ? "page" : "qr",
   );
-  const hasPagePreview = ["pdf", "contact", "business", "social"].includes(
-    type,
-  );
+  const hasPagePreview = hasPublishingPage(type);
   const [data, setData] = useState<Record<string, string>>(
     code?.data || {
       security: "WPA",
@@ -242,13 +239,15 @@ export default function Editor({
                         className={`type-option ${type === t ? "selected" : ""}`}
                         onClick={() => {
                           setType(t);
-                          setPreview(
-                            ["pdf", "contact", "business", "social"].includes(t)
-                              ? "page"
-                              : "qr",
-                          );
+                          setPreview(hasPublishingPage(t) ? "page" : "qr");
                           setDynamic(t === "url" || isHosted(t));
                           if (t === "business") changeData("links", "[]");
+                          changeData("mediaId", "");
+                          if (t === "hosted-event" && !data.timeZone)
+                            changeData(
+                              "timeZone",
+                              Intl.DateTimeFormat().resolvedOptions().timeZone,
+                            );
                           setError("");
                         }}
                         title={typeDescriptions[t]}
@@ -270,13 +269,17 @@ export default function Editor({
                     maxLength={100}
                   />
                 </label>
-                {["pdf", "contact", "business", "social"].includes(type) && (
+                {hasPublishingPage(type) && (
                   <PublishingFields
                     type={type}
                     data={data}
                     onData={changeData}
                     options={pageOptions}
                     onOptions={setPageOptions}
+                    onApplyTemplate={(data, options) => {
+                      setData(data);
+                      setPageOptions(options);
+                    }}
                   />
                 )}
                 {type === "url" && (

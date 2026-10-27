@@ -27,7 +27,7 @@ const safeArchivePath = (path) =>
   path === "manifest.json" ||
   path === "media/" ||
   path === "media" ||
-  /^media\/[a-f0-9-]{36}\.(pdf|png|jpg)$/.test(path);
+  /^media\/[a-f0-9-]{36}\.(pdf|png|jpg|mp3|mp4|webm)$/.test(path);
 const safeEntry = (path, type) =>
   safeArchivePath(path) &&
   (type === "Directory"
@@ -71,14 +71,10 @@ export async function createBackup({
         snapshot.close();
       }
       for (const file of files) {
-        const source = storage.filePath(file.storage_key);
+        const source = join(stage, "media", file.storage_key);
+        await storage.copyTo(file.storage_key, source);
         if ((await checksum(source)) !== file.sha256)
           throw new Error("A stored file failed its backup checksum.");
-        try {
-          await link(source, join(stage, "media", file.storage_key));
-        } catch {
-          await copyFile(source, join(stage, "media", file.storage_key));
-        }
       }
       await writeFile(
         join(stage, "manifest.json"),
@@ -107,6 +103,14 @@ export async function createBackup({
         .reverse();
       for (const old of archives.slice(Math.max(1, retention)))
         await unlink(join(folder, old));
+      if(storage.backupStore)await storage.backupStore.uploadArchive(archive,name);
+      else if (storage.backupBucket && storage.objectStore)
+        await storage.objectStore.uploadArchive(
+          archive,
+          name,
+          storage.backupBucket,
+          storage.backupPrefix || "openqr/backups/",
+        );
       return archive;
     } finally {
       await unlink(archive + ".partial").catch(() => {});
@@ -173,10 +177,10 @@ export async function restoreBackup({
     );
     if (
       manifest.format !== 1 ||
-      manifest.schema !== 4 ||
+      ![4, 5].includes(manifest.schema) ||
       !Array.isArray(manifest.files)
     )
-      throw new Error("This backup format is not supported by OpenQR v0.4.");
+      throw new Error("This backup format is not supported by OpenQR v0.5.");
     if (
       (await checksum(join(stage, "openqr.sqlite"))) !== manifest.databaseSha256
     )

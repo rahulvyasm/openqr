@@ -3,6 +3,8 @@ import { resolve, join } from "node:path";
 import { mkdirSync } from "node:fs";
 import { createApp } from "./app.js";
 import { createBackup, restoreBackup } from "./backup.js";
+import { storageOptionsFromEnv } from "./object-store.js";
+import { readFile } from "node:fs/promises";
 const args = process.argv.slice(2),
   root = resolve(process.env.DATA_DIR || "data");
 try {
@@ -18,12 +20,32 @@ try {
       confirmedStopped: args.includes("--confirm-stopped"),
       maxBytes: Number(process.env.RESTORE_MAX_BYTES || 1024 * 1024 * 1024),
     });
+    const options = storageOptionsFromEnv();
+    if (options.objectStore) {
+      const { db, storage } = createApp({
+        dbPath: join(root, "openqr.sqlite"),
+        storageOptions: options,
+      });
+      try {
+        for (const asset of db.prepare("SELECT * FROM assets").all())
+          await storage.put(
+            asset.storage_key,
+            await readFile(storage.filePath(asset.storage_key)),
+            asset.mime,
+          );
+      } finally {
+        db.close();
+      }
+    }
     console.log(
       `Restored OpenQR. Previous files are preserved in ${result.history}.\nKeep PUBLIC_URL set to ${result.publicUrl} so printed QR codes keep working.`,
     );
   } else {
     mkdirSync(root, { recursive: true });
-    const { db, storage } = createApp({ dbPath: join(root, "openqr.sqlite") });
+    const { db, storage } = createApp({
+      dbPath: join(root, "openqr.sqlite"),
+      storageOptions: storageOptionsFromEnv(),
+    });
     try {
       console.log(
         "Backup saved: " +

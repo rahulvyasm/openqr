@@ -1,5 +1,5 @@
 // RFC 5545 content shared by the live preview and exported QR payload.
-export function calendarEvent(data) {
+export function calendarEvent(data, uid) {
   const format = (value) =>
     new Date(value)
       .toISOString()
@@ -8,7 +8,7 @@ export function calendarEvent(data) {
   const escape = (value = "") =>
     value
       .replace(/\\/g, "\\\\")
-      .replace(/\r?\n/g, "\\n")
+      .replace(/\r\n|\r|\n/g, "\\n")
       .replace(/([;,])/g, "\\$1");
   let hash = 2166136261;
   for (const ch of `${data.title}|${data.startsAt}|${data.endsAt}`)
@@ -18,7 +18,7 @@ export function calendarEvent(data) {
     "VERSION:2.0",
     "PRODID:-//OpenQR//EN",
     "BEGIN:VEVENT",
-    `UID:${(hash >>> 0).toString(16)}@openqr.local`,
+    `UID:${uid || (hash >>> 0).toString(16)}@openqr.local`,
     `DTSTAMP:${format(data.startsAt)}`,
     `SUMMARY:${escape(data.title)}`,
     `DTSTART:${format(data.startsAt)}`,

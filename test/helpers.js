@@ -2,10 +2,11 @@ import assert from "node:assert/strict";
 import { once } from "node:events";
 import { createApp } from "../server/app.js";
 
-export async function fixture(t, dbPath = ":memory:") {
+export async function fixture(t, dbPath = ":memory:",options={}) {
   const { app, db, storage } = createApp({
     dbPath,
     publicUrl: "http://localhost:5173",
+    ...options,
   });
   const server = app.listen(0, "127.0.0.1");
   await once(server, "listening");

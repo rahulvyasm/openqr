@@ -13,9 +13,11 @@ import {
   validPublicTicket,
 } from "./public-access.js";
 import { contactCard } from "../shared/contact.js";
+import { calendarEvent } from "../shared/calendar.js";
+import { appDestination } from "../shared/app-routing.js";
 
 export function migrateCodes(db) {
-  if (db.prepare("PRAGMA user_version").get().user_version > 4)
+  if (db.prepare("PRAGMA user_version").get().user_version > 5)
     throw new Error(
       "This database belongs to a newer OpenQR release. Upgrade the server before opening it.",
     );
@@ -560,7 +562,16 @@ export function registerCodeRoutes(app, db, origin, analyticsSalt, storage) {
       return res.type("html").send(linksPage(result.code));
     if (hostedTypes.includes(result.code.type)) {
       const c = result.code,
-        ticket = publicTicket(c.id, analyticsSalt);
+        ticket = publicTicket(
+          c.id,
+          analyticsSalt,
+          ["audio", "video"].includes(c.type) ? 25 * 60 : 15,
+        );
+      if (c.type === "app" && c.data.routing === "smart")
+        return res.redirect(
+          302,
+          appDestination(c.data, req.get("user-agent") || ""),
+        );
       if (c.type === "pdf" && c.data.direct === "true")
         return res.redirect(
           302,
@@ -621,9 +632,20 @@ export function registerCodeRoutes(app, db, origin, analyticsSalt, storage) {
         );
       res.set("Content-Security-Policy", "sandbox; default-src 'none'");
     }
-    res.sendFile(storage.filePath(asset.storage_key), (error) => {
-      if (error) next(error);
-    });
+    if (req.query.download === "1") {
+      if (
+        code.data.allowDownload !== "true" ||
+        !["audio", "video", "gallery"].includes(code.type)
+      )
+        throw invalid("Downloads are not enabled for this page.", 403);
+      res.attachment(
+        asset.name.replace(/\.[^.]+$/, "") +
+          "." +
+          asset.storage_key.split(".").at(-1),
+      );
+      res.type(asset.mime);
+    }
+    storage.serve(asset.storage_key, req, res, next);
   });
   app.get("/r/:slug/contact.vcf", (req, res) => {
     const { code } = publicCode(req);
@@ -652,5 +674,75 @@ export function registerCodeRoutes(app, db, origin, analyticsSalt, storage) {
         pages: asset.pages,
         downloadUrl: `/r/${encodeURIComponent(code.slug)}/media/${encodeURIComponent(req.params.id)}?ticket=${encodeURIComponent(req.query.ticket)}`,
       });
+  });
+  app.get("/r/:slug/event.ics", (req, res) => {
+    const { code } = publicCode(req);
+    if (code.type !== "hosted-event") throw invalid("Event not found.", 404);
+    res
+      .set({ "Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow" })
+      .attachment("event.ics")
+      .type("text/calendar")
+      .send(
+        calendarEvent(
+          {
+            ...code.data,
+            location: [code.data.venue, code.data.address]
+              .filter(Boolean)
+              .join(", "),
+          },
+          code.id,
+        ),
+      );
+  });
+  app.get("/api/page-templates", (req, res) =>
+    res.json(
+      db
+        .prepare(
+          "SELECT * FROM page_templates WHERE workspace_id=? ORDER BY name",
+        )
+        .all(req.workspace.id)
+        .map((row) => ({
+          id: row.id,
+          name: row.name,
+          type: row.type,
+          data: JSON.parse(row.data),
+          pageOptions: JSON.parse(row.page_options),
+        })),
+    ),
+  );
+  app.post("/api/page-templates", async (req, res) => {
+    const c = await validate({ ...req.body, dynamic: true }, req.workspace.id);
+    if (!hostedTypes.includes(c.type) || c.type === "links")
+      throw invalid("Choose a supported publishing page type.");
+    const id = randomUUID();
+    await storage.exclusive(() => {
+      req.assertEdit();
+      validateAssetReferences(db, c.data, req.workspace.id, c.type);
+      if (
+        db
+          .prepare(
+            "SELECT 1 FROM page_templates WHERE workspace_id=? AND name=?",
+          )
+          .get(req.workspace.id, c.name)
+      )
+        throw invalid("A page template with that name already exists.", 409);
+      db.prepare("INSERT INTO page_templates VALUES (?,?,?,?,?,?,?)").run(
+        id,
+        req.workspace.id,
+        req.user.id,
+        c.name,
+        c.type,
+        JSON.stringify(c.data),
+        JSON.stringify(c.pageOptions),
+      );
+    });
+    res.status(201).json({ id });
+  });
+  app.delete("/api/page-templates/:id", (req, res) => {
+    db.prepare("DELETE FROM page_templates WHERE id=? AND workspace_id=?").run(
+      req.params.id,
+      req.workspace.id,
+    );
+    res.json({ ok: true });
   });
 }

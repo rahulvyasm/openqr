@@ -13,6 +13,11 @@ import {
   ContactRound,
   Building2,
   Share2,
+  Images,
+  Music,
+  Video,
+  CalendarClock,
+  Smartphone,
 } from "lucide-react";
 export const typeIcons = {
   url: Globe,
@@ -30,6 +35,11 @@ export const typeIcons = {
   contact: ContactRound,
   business: Building2,
   social: Share2,
+  gallery: Images,
+  audio: Music,
+  video: Video,
+  "hosted-event": CalendarClock,
+  app: Smartphone,
 };
 export const typeDescriptions = {
   url: "Any website, one scan away",
@@ -47,4 +57,9 @@ export const typeDescriptions = {
   contact: "A digital business card with a save-contact button",
   business: "Your business, hours, and directions in one place",
   social: "Bring every social channel together",
+  gallery: "A photo collection worth sharing",
+  audio: "Your audio, ready to play",
+  video: "A mobile premiere for your video",
+  "hosted-event": "An event page with directions and calendar download",
+  app: "Send each phone to the right app store",
 };

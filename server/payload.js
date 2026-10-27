@@ -26,9 +26,14 @@ export const codeSchema = z.object({
     "contact",
     "business",
     "social",
+    "gallery",
+    "audio",
+    "video",
+    "hosted-event",
+    "app",
   ]),
   dynamic: z.boolean().default(false),
-  data: z.record(z.string(), z.string().max(6000)),
+  data: z.record(z.string(), z.string().max(20000)),
   folderId: z.string().nullable().default(null),
   color: z
     .string()
@@ -73,7 +78,7 @@ export function payload(code) {
     throw new Error(
       "Only website and hosted-page codes support dynamic links.",
     );
-  if (["pdf", "contact", "business", "social"].includes(code.type))
+  if (hostedTypes.includes(code.type) && code.type !== "links")
     return validateHosted(code);
   if (code.type === "links" && !code.dynamic)
     throw new Error("Use a dynamic code for a hosted link page.");

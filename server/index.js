@@ -3,6 +3,7 @@ import { mkdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { createApp } from "./app.js";
 import { createBackup } from "./backup.js";
+import { storageOptionsFromEnv } from "./object-store.js";
 const port = Number(process.env.PORT || 3001);
 const dataDir = resolve(process.env.DATA_DIR || "data");
 mkdirSync(dataDir, { recursive: true });
@@ -11,6 +12,7 @@ const { app, db, storage } = createApp({
   publicUrl: process.env.PUBLIC_URL || "http://localhost:5173",
   secureCookie: process.env.COOKIE_SECURE === "true",
   trustProxy: process.env.TRUST_PROXY === "1",
+  storageOptions: storageOptionsFromEnv(),
 });
 const host =
   process.env.HOST ||

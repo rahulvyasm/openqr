@@ -1,16 +1,51 @@
 import express from "express";
 import { randomUUID, createHash } from "node:crypto";
-import { mkdir, open, readFile, rename, unlink, rm } from "node:fs/promises";
+import {
+  mkdir,
+  open,
+  readFile,
+  rename,
+  unlink,
+  rm,
+  access,
+  copyFile,
+} from "node:fs/promises";
 import { resolve, dirname, join, basename } from "node:path";
 import { tmpdir, hostname } from "node:os";
 import sharp from "sharp";
 import { PDFDocument } from "pdf-lib";
 import { problem, audit } from "./security.js";
+import {constants} from 'node:fs';
+import { inspectMedia } from "./media.js";
+import { parseGallery } from "./collections.js";
 
-export const assetFields = ["pdfId", "portraitId", "coverId"];
-export const referencedAssets = (data) => [
-  ...new Set(assetFields.map((key) => data[key]).filter(Boolean)),
-];
+export const assetFields = ["pdfId", "portraitId", "coverId", "mediaId"];
+export const referencedAssets = (data) => {
+  let items = [];
+  try {
+    items = JSON.parse(data.items || "[]");
+  } catch {}
+  return [
+    ...new Set(
+      [
+        ...assetFields.map((key) => data[key]),
+        ...(Array.isArray(items) ? items.map((item) => item?.assetId) : []),
+      ].filter(Boolean),
+    ),
+  ];
+};
+export function migrateCollections(db) {
+  if (db.prepare("PRAGMA user_version").get().user_version >= 5) return;
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    db.exec(
+      "ALTER TABLE assets ADD COLUMN metadata TEXT NOT NULL DEFAULT '{}'; CREATE TABLE page_templates(id TEXT PRIMARY KEY,workspace_id TEXT NOT NULL REFERENCES workspaces(id),user_id TEXT NOT NULL REFERENCES users(id),name TEXT NOT NULL,type TEXT NOT NULL,data TEXT NOT NULL,page_options TEXT NOT NULL,UNIQUE(workspace_id,name)); PRAGMA user_version=5; COMMIT;",
+    );
+  } catch (e) {
+    db.exec("ROLLBACK");
+    throw e;
+  }
+}
 export function migratePublishing(db) {
   if (db.prepare("PRAGMA user_version").get().user_version >= 4) return;
   try {
@@ -22,12 +57,22 @@ export function migratePublishing(db) {
     throw error;
   }
 }
-export function createStorage(root) {
+export function createStorage(
+  root,
+  {
+    objectStore,
+    quota = 1024 * 1024 * 1024,
+    maxUpload = 100 * 1024 * 1024,
+    backupBucket,
+    backupPrefix,
+    backupStore,
+  } = {},
+) {
   const temporary = !root,
     mediaDir = resolve(root || join(tmpdir(), `openqr-media-${randomUUID()}`)),
     lockPath = join(dirname(mediaDir), `.${basename(mediaDir)}.lock`);
   const filePath = (key) => {
-    if (!/^[a-f0-9-]{36}\.(pdf|png|jpg)$/.test(key))
+    if (!/^[a-f0-9-]{36}\.(pdf|png|jpg|mp3|mp4|webm)$/.test(key))
       throw problem("Invalid stored file.", 500);
     return join(mediaDir, key);
   };
@@ -71,9 +116,80 @@ export function createStorage(root) {
   }
   return {
     root: mediaDir,
+    kind: objectStore ? "s3" : "local",
+    quota,
+    maxUpload,
+    objectStore,
+    backupBucket,
+    backupPrefix,
+    backupStore,
     temporary,
     filePath,
     exclusive,
+    async put(key, bytes, mime) {
+      if (objectStore) return objectStore.put(key, bytes, mime);
+      await mkdir(mediaDir, { recursive: true });
+      const file = await open(filePath(key), "wx");
+      try {
+        await file.writeFile(bytes);
+      } catch (e) {
+        await unlink(filePath(key)).catch(() => {});
+        throw e;
+      } finally {
+        await file.close();
+      }
+    },
+    async read(key) {
+      if (objectStore) {
+        try {
+          return await objectStore.read(key);
+        } catch (e) {
+          if (!["NoSuchKey", "NotFound"].includes(e.name)) throw e;
+        }
+      }
+      return readFile(filePath(key));
+    },
+    async copyTo(key, path) {
+      if (objectStore) {
+        try {
+          return await objectStore.copyTo(key, path);
+        } catch (e) {
+          if (!["NoSuchKey", "NotFound"].includes(e.name)) throw e;
+        }
+      }
+      return copyFile(filePath(key), path);
+    },
+    async remove(key) {
+      if (objectStore) await objectStore.remove(key);
+      await unlink(filePath(key)).catch((e) => {
+        if (e.code !== "ENOENT") throw e;
+      });
+    },
+    async serve(key, req, res, next) {
+      try {
+        if (objectStore) {
+          try {
+            return await objectStore.serve(key, req, res);
+          } catch (e) {
+            if (!["NoSuchKey", "NotFound"].includes(e.name)) throw e;
+          }
+        }
+        res.sendFile(filePath(key), (e) => {
+          if (e) next(e);
+        });
+      } catch (e) {
+        if (res.headersSent) {
+          res.destroy();
+          return;
+        }
+        next(problem("File storage is unavailable. Try again shortly.", 503));
+      }
+    },
+    async ready() {
+      await mkdir(mediaDir, { recursive: true });
+      await access(mediaDir,constants.W_OK);
+      if (objectStore) await objectStore.ready();
+    },
     async dispose() {
       if (temporary) {
         await rm(mediaDir, { recursive: true, force: true });
@@ -90,6 +206,7 @@ export function serializeAsset(row) {
     mime: row.mime,
     size: row.size,
     pages: row.pages,
+    metadata: JSON.parse(row.metadata || "{}"),
     createdAt: row.created_at,
     url: `/api/assets/${row.id}/content`,
   };
@@ -100,13 +217,42 @@ export function validateAssetReferences(db, data, workspaceId, type) {
     const row = db
       .prepare("SELECT kind FROM assets WHERE id=? AND workspace_id=?")
       .get(data[key], workspaceId);
-    if (!row || (key === "pdfId") !== (row.kind === "pdf"))
+    const expected =
+      key === "pdfId"
+        ? ["pdf"]
+        : key === "mediaId"
+          ? ["audio", "video"].includes(type)
+            ? [type]
+            : ["audio", "video"]
+          : ["image", "logo"];
+    if (!row || !expected.includes(row.kind))
       throw problem("Choose a valid file from this workspace.");
   }
   if (type === "pdf" && !data.pdfId)
     throw problem("Choose a PDF for this page.");
+  if (type === "gallery")
+    for (const item of parseGallery(data)) {
+      const row = db
+        .prepare("SELECT kind FROM assets WHERE id=? AND workspace_id=?")
+        .get(item.assetId, workspaceId);
+      if (!row || !["image", "logo"].includes(row.kind))
+        throw problem("Choose gallery images from this workspace.");
+    }
 }
 export function registerAssetRoutes(app, db, storage) {
+  let uploads=0;
+  app.get("/api/storage", (req, res) =>
+    res.json({
+      usedBytes: db
+        .prepare(
+          "SELECT COALESCE(SUM(size),0) total FROM assets WHERE workspace_id=?",
+        )
+        .get(req.workspace.id).total,
+      limitBytes: storage.quota,
+      maxUploadBytes: storage.maxUpload,
+      backend: storage.kind,
+    }),
+  );
   app.get("/api/assets", (req, res) =>
     res.json(
       db
@@ -119,10 +265,11 @@ export function registerAssetRoutes(app, db, storage) {
   );
   app.post(
     "/api/assets",
-    express.raw({ type: () => true, limit: "20mb" }),
+    (req,res,next)=>{if(uploads>=2)return res.status(429).json({error:'Two uploads are already being processed. Try again shortly.'});uploads++;let released=false;const release=()=>{if(!released){released=true;uploads--;}};res.once('finish',release);res.once('close',release);next();},
+    express.raw({ type: () => true, limit: storage.maxUpload }),
     async (req, res) => {
       if (!Buffer.isBuffer(req.body) || !req.body.length)
-        throw problem("Choose a PDF, PNG, or JPEG file.");
+        throw problem("Choose a PDF, PNG, JPEG, MP3, MP4, or WebM file.");
       let name;
       try {
         name = decodeURIComponent(req.get("x-file-name") || "Untitled file");
@@ -137,8 +284,18 @@ export function registerAssetRoutes(app, db, storage) {
       let bytes,
         mime,
         kind,
-        pages = null;
-      if (original.subarray(0, 5).toString() === "%PDF-") {
+        pages = null,
+        metadata = {},
+        extension;
+      const media = await inspectMedia(original);
+      if (media) {
+        if (req.query.kind === "logo")
+          throw problem("Choose a PNG or JPEG for your logo.");
+        ({ mime, kind, extension, metadata } = media);
+        bytes = original;
+      } else if (original.length > 20 * 1024 * 1024)
+        throw problem("PDFs and images must be at most 20 MB.");
+      else if (original.subarray(0, 5).toString() === "%PDF-") {
         if (req.query.kind === "logo")
           throw problem("Choose a PNG or JPEG for your logo.");
         try {
@@ -189,18 +346,30 @@ export function registerAssetRoutes(app, db, storage) {
         }
       }
       const id = randomUUID(),
-        key = `${id}.${kind === "pdf" ? "pdf" : mime === "image/png" ? "png" : "jpg"}`,
+        key = `${id}.${extension || (kind === "pdf" ? "pdf" : mime === "image/png" ? "png" : "jpg")}`,
         hash = createHash("sha256").update(bytes).digest("hex");
       await storage.exclusive(async () => {
+        if(req.aborted||res.destroyed)throw problem('Upload cancelled.');
         req.assertEdit();
-        const file = await open(storage.filePath(key), "wx");
+        const used = db
+          .prepare(
+            "SELECT COALESCE(SUM(size),0) total FROM assets WHERE workspace_id=?",
+          )
+          .get(req.workspace.id).total;
+        if (used + bytes.length > storage.quota)
+          throw problem(
+            "This workspace has reached its storage limit. Remove unused files or ask the server operator to increase it.",
+            413,
+          );
+        await storage.put(key, bytes, mime);
+        let inserting=false;
         try {
-          await file.writeFile(bytes);
-        } finally {
-          await file.close();
-        }
-        try {
-          db.prepare("INSERT INTO assets VALUES (?,?,?,?,?,?,?,?,?,?,?)").run(
+          if(req.aborted||res.destroyed)throw problem('Upload cancelled.');
+          req.assertEdit();
+          db.exec('BEGIN IMMEDIATE');inserting=true;
+          db.prepare(
+            "INSERT INTO assets (id,workspace_id,user_id,name,kind,mime,size,storage_key,sha256,pages,created_at,metadata) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+          ).run(
             id,
             req.workspace.id,
             req.user.id,
@@ -212,13 +381,16 @@ export function registerAssetRoutes(app, db, storage) {
             hash,
             pages,
             new Date().toISOString(),
+            JSON.stringify(metadata),
           );
           audit(db, req.workspace.id, req.user.id, "asset.uploaded", id, {
             name,
             kind,
           });
+          db.exec('COMMIT');inserting=false;
         } catch (e) {
-          await unlink(storage.filePath(key));
+          if(inserting)db.exec('ROLLBACK');
+          await storage.remove(key);
           throw e;
         }
       });
@@ -243,9 +415,7 @@ export function registerAssetRoutes(app, db, storage) {
         "Content-Disposition": 'attachment; filename="document.pdf"',
         "Content-Security-Policy": "sandbox; default-src 'none'",
       });
-    res.sendFile(storage.filePath(row.storage_key), (error) => {
-      if (error) next(error);
-    });
+    storage.serve(row.storage_key, req, res, next);
   });
   app.delete("/api/assets/:id", async (req, res) => {
     await storage.exclusive(async () => {
@@ -258,24 +428,39 @@ export function registerAssetRoutes(app, db, storage) {
         db
           .prepare("SELECT data FROM codes WHERE workspace_id=?")
           .all(req.workspace.id)
-          .some((c) => referencedAssets(JSON.parse(c.data)).includes(row.id))
+          .some((c) => referencedAssets(JSON.parse(c.data)).includes(row.id)) ||
+        db
+          .prepare("SELECT data FROM page_templates WHERE workspace_id=?")
+          .all(req.workspace.id)
+          .some((t) => referencedAssets(JSON.parse(t.data)).includes(row.id))
       )
         throw problem(
-          "This file is used by a QR page. Replace it on that page before removing it.",
+          "This file is used by a QR page or page template. Replace it there before removing it.",
           409,
         );
-      const trash = storage.filePath(row.storage_key) + ".trash";
-      await rename(storage.filePath(row.storage_key), trash);
+      db.prepare("DELETE FROM assets WHERE id=? AND workspace_id=?").run(
+        row.id,
+        req.workspace.id,
+      );
       try {
-        db.prepare("DELETE FROM assets WHERE id=? AND workspace_id=?").run(
-          row.id,
-          req.workspace.id,
-        );
+        await storage.remove(row.storage_key);
       } catch (e) {
-        await rename(trash, storage.filePath(row.storage_key));
+        db.prepare("INSERT INTO assets VALUES (?,?,?,?,?,?,?,?,?,?,?,?)").run(
+          row.id,
+          row.workspace_id,
+          row.user_id,
+          row.name,
+          row.kind,
+          row.mime,
+          row.size,
+          row.storage_key,
+          row.sha256,
+          row.pages,
+          row.created_at,
+          row.metadata,
+        );
         throw e;
       }
-      await unlink(trash);
       audit(db, req.workspace.id, req.user.id, "asset.deleted", row.id, {
         name: row.name,
       });
