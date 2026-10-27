@@ -7,10 +7,11 @@ import { normalizeDesign, imageFor } from "./design.js";
 import { linksPage, unavailablePage } from "./pages.js";
 
 export function migrateCodes(db) {
-  if (db.prepare("PRAGMA user_version").get().user_version > 2)
+  if (db.prepare("PRAGMA user_version").get().user_version > 3)
     throw new Error(
       "This database belongs to a newer OpenQR release. Upgrade the server before opening it.",
     );
+  if (db.prepare("PRAGMA user_version").get().user_version >= 2) return;
   db.exec("BEGIN IMMEDIATE");
   try {
     const columns = new Set(
@@ -85,19 +86,19 @@ export function registerCodeRoutes(app, db, origin, analyticsSalt) {
     design: JSON.parse(row.design || "{}"),
     campaign: JSON.parse(row.campaign || "{}"),
   });
-  const getCode = (id, userId) =>
+  const getCode = (id, workspaceId) =>
     db
       .prepare(
-        "SELECT c.*,(SELECT COUNT(*) FROM scans WHERE code_id=c.id) AS scans FROM codes c WHERE c.id=? AND c.user_id=?",
+        "SELECT c.*,(SELECT COUNT(*) FROM scans WHERE code_id=c.id) AS scans FROM codes c WHERE c.id=? AND c.workspace_id=?",
       )
-      .get(id, userId);
-  const ownedCodes = (ids, userId) =>
+      .get(id, workspaceId);
+  const ownedCodes = (ids, workspaceId) =>
     ids.map((id) => {
-      const row = getCode(id, userId);
+      const row = getCode(id, workspaceId);
       if (!row) throw invalid("QR code not found.", 404);
       return row;
     });
-  const validate = async (body, userId) => {
+  const validate = async (body, workspaceId) => {
     const c = codeSchema.parse(body);
     const content = payload(c);
     if (c.type !== "links")
@@ -106,8 +107,8 @@ export function registerCodeRoutes(app, db, origin, analyticsSalt) {
     if (
       c.folderId &&
       !db
-        .prepare("SELECT id FROM folders WHERE id=? AND user_id=?")
-        .get(c.folderId, userId)
+        .prepare("SELECT id FROM folders WHERE id=? AND workspace_id=?")
+        .get(c.folderId, workspaceId)
     )
       throw invalid("Folder not found.");
     if (
@@ -133,16 +134,16 @@ export function registerCodeRoutes(app, db, origin, analyticsSalt) {
       throw invalid("Only website codes support UTM tags.");
     return c;
   };
-  const insert = (c, userId) => {
+  const insert = (c, workspaceId, creatorId) => {
     const id = randomUUID(),
       slug = c.slug || randomBytes(8).toString("base64url");
     if (db.prepare("SELECT id FROM codes WHERE slug=?").get(slug))
       throw invalid("That short link is already taken. Choose another.", 409);
     db.prepare(
-      "INSERT INTO codes (id,user_id,slug,name,type,dynamic,data,folder_id,color,active,created_at,design,campaign) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+      "INSERT INTO codes (id,user_id,slug,name,type,dynamic,data,folder_id,color,active,created_at,design,campaign,workspace_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
     ).run(
       id,
-      userId,
+      creatorId,
       slug,
       c.name,
       c.type,
@@ -154,22 +155,24 @@ export function registerCodeRoutes(app, db, origin, analyticsSalt) {
       new Date().toISOString(),
       JSON.stringify(c.design),
       JSON.stringify(c.campaign),
+      workspaceId,
     );
-    return serialize(getCode(id, userId));
+    return serialize(getCode(id, workspaceId));
   };
   app.get("/api/codes", (req, res) =>
     res.json(
       db
         .prepare(
-          "SELECT c.*,(SELECT COUNT(*) FROM scans WHERE code_id=c.id) AS scans FROM codes c WHERE c.user_id=? ORDER BY c.created_at DESC,c.rowid DESC",
+          "SELECT c.*,(SELECT COUNT(*) FROM scans WHERE code_id=c.id) AS scans FROM codes c WHERE c.workspace_id=? ORDER BY c.created_at DESC,c.rowid DESC",
         )
-        .all(req.user.id)
+        .all(req.workspace.id)
         .map(serialize),
     ),
   );
   app.post("/api/codes", async (req, res) => {
-    const c = await validate(req.body, req.user.id);
-    res.status(201).json(insert(c, req.user.id));
+    const c = await validate(req.body, req.workspace.id);
+    req.assertEdit();
+    res.status(201).json(insert(c, req.workspace.id, req.user.id));
   });
   app.post("/api/codes/bulk", async (req, res) => {
     const input = z
@@ -195,15 +198,18 @@ export function registerCodeRoutes(app, db, origin, analyticsSalt) {
     const codes = [];
     for (const [index, row] of input.codes.entries()) {
       try {
-        codes.push(await validate({ ...input.common, ...row }, req.user.id));
+        codes.push(
+          await validate({ ...input.common, ...row }, req.workspace.id),
+        );
       } catch (e) {
         throw invalid(
           `Row ${index + 2}: ${e instanceof z.ZodError ? "Check the content fields." : e.message}`,
         );
       }
     }
+    req.assertEdit();
     const result = transaction(db, () =>
-      codes.map((c) => insert(c, req.user.id)),
+      codes.map((c) => insert(c, req.workspace.id, req.user.id)),
     );
     res.status(201).json(result);
   });
@@ -215,13 +221,13 @@ export function registerCodeRoutes(app, db, origin, analyticsSalt) {
         folderId: z.string().nullable().optional(),
       })
       .parse(req.body);
-    const rows = ownedCodes(input.ids, req.user.id);
+    const rows = ownedCodes(input.ids, req.workspace.id);
     if (
       input.action === "move" &&
       input.folderId &&
       !db
-        .prepare("SELECT id FROM folders WHERE id=? AND user_id=?")
-        .get(input.folderId, req.user.id)
+        .prepare("SELECT id FROM folders WHERE id=? AND workspace_id=?")
+        .get(input.folderId, req.workspace.id)
     )
       throw invalid("Folder not found.");
     transaction(db, () => {
@@ -258,7 +264,7 @@ export function registerCodeRoutes(app, db, origin, analyticsSalt) {
           .default(1024),
       })
       .parse(req.body);
-    const codes = ownedCodes(ids, req.user.id).map(serialize),
+    const codes = ownedCodes(ids, req.workspace.id).map(serialize),
       files = {};
     for (const c of codes)
       files[
@@ -284,23 +290,24 @@ export function registerCodeRoutes(app, db, origin, analyticsSalt) {
         2,
       ),
     );
+    req.assertRead();
     res
       .set("Content-Disposition", 'attachment; filename="openqr-codes.zip"')
       .type("application/zip")
       .send(Buffer.from(zipSync(files)));
   });
   app.post("/api/codes/:id/duplicate", (req, res) => {
-    const row = getCode(req.params.id, req.user.id);
+    const row = getCode(req.params.id, req.workspace.id);
     if (!row) throw invalid("QR code not found.", 404);
     const copy = serialize(row);
     delete copy.slug;
     copy.name = `${copy.name.slice(0, 93)} (copy)`;
-    res.status(201).json(insert(copy, req.user.id));
+    res.status(201).json(insert(copy, req.workspace.id, req.user.id));
   });
   app.put("/api/codes/:id", async (req, res) => {
-    const old = getCode(req.params.id, req.user.id);
+    const old = getCode(req.params.id, req.workspace.id);
     if (!old) throw invalid("QR code not found.", 404);
-    const c = await validate(req.body, req.user.id);
+    const c = await validate(req.body, req.workspace.id);
     if (c.type !== old.type || +c.dynamic !== old.dynamic)
       throw invalid("Code type cannot change after creation.");
     if (c.slug && c.slug !== old.slug)
@@ -309,8 +316,9 @@ export function registerCodeRoutes(app, db, origin, analyticsSalt) {
       );
     if (!old.dynamic && payload(c) !== payload(serialize(old)))
       throw invalid("Static QR content cannot be edited. Create a new code.");
+    req.assertEdit();
     db.prepare(
-      "UPDATE codes SET name=?,data=?,folder_id=?,color=?,active=?,design=?,campaign=? WHERE id=? AND user_id=?",
+      "UPDATE codes SET name=?,data=?,folder_id=?,color=?,active=?,design=?,campaign=? WHERE id=? AND workspace_id=?",
     ).run(
       c.name,
       JSON.stringify(c.data),
@@ -320,50 +328,50 @@ export function registerCodeRoutes(app, db, origin, analyticsSalt) {
       JSON.stringify(c.design),
       JSON.stringify(c.campaign),
       old.id,
-      req.user.id,
+      req.workspace.id,
     );
-    res.json(serialize(getCode(old.id, req.user.id)));
+    res.json(serialize(getCode(old.id, req.workspace.id)));
   });
   app.delete("/api/codes/:id", (req, res) => {
-    if (!getCode(req.params.id, req.user.id))
+    if (!getCode(req.params.id, req.workspace.id))
       throw invalid("QR code not found.", 404);
-    db.prepare("DELETE FROM codes WHERE id=? AND user_id=?").run(
+    db.prepare("DELETE FROM codes WHERE id=? AND workspace_id=?").run(
       req.params.id,
-      req.user.id,
+      req.workspace.id,
     );
     res.json({ ok: true });
   });
   app.get("/api/codes/:id/download", async (req, res) => {
-    const row = getCode(req.params.id, req.user.id);
+    const row = getCode(req.params.id, req.workspace.id);
     if (!row) throw invalid("QR code not found.", 404);
     const c = serialize(row),
       format = req.query.format === "svg" ? "svg" : "png",
       size = [512, 1024, 2048].includes(Number(req.query.size))
         ? Number(req.query.size)
         : 1024;
+    const bytes = await imageFor(
+      c.dynamic ? c.shortUrl : payload(c),
+      c.design,
+      c.color,
+      format,
+      size,
+    );
+    req.assertRead();
     res
       .set(
         "Content-Disposition",
         `attachment; filename="openqr-${c.slug}.${format}"`,
       )
       .type(format === "svg" ? "image/svg+xml" : "image/png")
-      .send(
-        await imageFor(
-          c.dynamic ? c.shortUrl : payload(c),
-          c.design,
-          c.color,
-          format,
-          size,
-        ),
-      );
+      .send(bytes);
   });
   app.get("/api/templates", (req, res) =>
     res.json(
       db
         .prepare(
-          "SELECT id,name,color,design FROM templates WHERE user_id=? ORDER BY name",
+          "SELECT id,name,color,design FROM templates WHERE workspace_id=? ORDER BY name",
         )
-        .all(req.user.id)
+        .all(req.workspace.id)
         .map((t) => ({ ...t, design: JSON.parse(t.design) })),
     ),
   );
@@ -378,24 +386,28 @@ export function registerCodeRoutes(app, db, origin, analyticsSalt) {
     const design = await normalizeDesign(input.design, input.color);
     if (
       db
-        .prepare("SELECT id FROM templates WHERE user_id=? AND name=?")
-        .get(req.user.id, input.name)
+        .prepare("SELECT id FROM templates WHERE workspace_id=? AND name=?")
+        .get(req.workspace.id, input.name)
     )
       throw invalid("A design with that name already exists.", 409);
+    req.assertEdit();
     const id = randomUUID();
-    db.prepare("INSERT INTO templates VALUES (?,?,?,?,?)").run(
+    db.prepare(
+      "INSERT INTO templates (id,user_id,name,color,design,workspace_id) VALUES (?,?,?,?,?,?)",
+    ).run(
       id,
       req.user.id,
       input.name,
       input.color,
       JSON.stringify(design),
+      req.workspace.id,
     );
     res.status(201).json({ id, name: input.name, color: input.color, design });
   });
   app.delete("/api/templates/:id", (req, res) => {
-    db.prepare("DELETE FROM templates WHERE id=? AND user_id=?").run(
+    db.prepare("DELETE FROM templates WHERE id=? AND workspace_id=?").run(
       req.params.id,
-      req.user.id,
+      req.workspace.id,
     );
     res.json({ ok: true });
   });
@@ -409,8 +421,8 @@ export function registerCodeRoutes(app, db, origin, analyticsSalt) {
     const codeId =
       typeof req.query.codeId === "string" ? req.query.codeId : null;
     const where =
-      "FROM scans s JOIN codes c ON c.id=s.code_id WHERE c.user_id=? AND s.scanned_at>=? AND (? IS NULL OR c.id=?)";
-    const params = [req.user.id, since.toISOString(), codeId, codeId];
+      "FROM scans s JOIN codes c ON c.id=s.code_id WHERE c.workspace_id=? AND s.scanned_at>=? AND (? IS NULL OR c.id=?)";
+    const params = [req.workspace.id, since.toISOString(), codeId, codeId];
     const totals = db
       .prepare(
         `SELECT COUNT(*) AS total,COUNT(DISTINCT s.visitor) AS uniqueDailyVisitors ${where}`,

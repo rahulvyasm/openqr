@@ -10,9 +10,11 @@ This is an independent implementation. It does not reuse QR Code Generator's cod
 
 _Dashboard from a disposable test workspace. Your instance starts empty._
 
-## What's included in v0.2
+## What's included in v0.3
 
-- Owner account setup and sign-in, password hashing, expiring server-side sessions, and sign-out.
+- Account setup, invite-based team signup, password updates, operator-managed recovery, session management, and profile settings.
+- Workspaces with Owner, Admin, Editor, and Viewer roles enforced by the server across codes, exports, folders, designs, analytics, and team administration.
+- Single-use invitations, expiry, renewal, revocation, password-confirmed ownership transfer, and a workspace security activity log.
 - Eleven QR types: website, plain text, Wi-Fi, email, phone, vCard, SMS, WhatsApp, location, calendar event, and hosted link pages.
 - Dynamic website codes: change destinations without changing the printed QR; pause and resume links.
 - Static codes: content lives directly in the QR and does not depend on the server.
@@ -30,9 +32,46 @@ There is no third-party analytics SDK or external font service. No sample scans 
 
 ![OpenQR advanced designer](docs/designer.jpg)
 
-## Upgrading from v0.1
+## Upgrading from v0.1 or v0.2
 
 Back up your DATA_DIR, stop the server, install dependencies with `npm ci`, rebuild with `npm run build`, and restart. The schema migrates automatically on startup. Existing code IDs, short links, saved content, and scan history are preserved. Older scans show `Unknown` for newly introduced analytics fields. Changing a design only changes future downloads; copies already printed retain their original design and payload.
+
+v0.3 assigns each existing account and its codes, folders, designs, and sessions to an owner workspace. Existing password hashes remain compatible. No printed links change. The migration runs transactionally and checks database references before committing; schema versions from a newer release are rejected rather than downgraded.
+
+## Teams and workspaces
+
+Use the workspace menu to create or switch workspaces. Codes, folders, saved designs, and analytics belong to a workspace; removing a member preserves their contributions and printed links.
+
+| Role   | Codes and designs    | Analytics and exports | Team administration                              |
+| ------ | -------------------- | --------------------- | ------------------------------------------------ |
+| Owner  | Create, edit, delete | View and download     | All roles; password-confirmed ownership transfer |
+| Admin  | Create, edit, delete | View and download     | Invite and manage Editors/Viewers                |
+| Editor | Create, edit, delete | View and download     | View members                                     |
+| Viewer | Read only            | View and download     | View members                                     |
+
+In **Workspace settings → Team**, create an invitation for an email and a role. The link is shown once for private sharing. No email is sent automatically. Links expire after seven days and work once. Renewing a link invalidates its previous token. Existing account holders must sign in with the invited email; a link cannot silently attach another logged-in account.
+
+Demoting/removing a manager revokes their pending invitations when they lose team-management rights. Only an Owner may appoint or manage Admins. The owner cannot be removed or demoted through ordinary member controls. Team changes apply to existing sessions on their next API request.
+
+Owners and Admins can view the latest 100 team/account security events in **Activity**. Passwords and live invitation/recovery tokens are excluded. **My account** lets each user update their name/password, inspect sessions, sign out another session, or sign out all other sessions. Password changes rotate the current session and revoke the others.
+
+![OpenQR workspace team](docs/team.jpg)
+
+_Team preview from a disposable test workspace; names and example.com addresses are test data._
+
+### Account recovery
+
+The server operator can issue a recovery link without an email-provider dependency:
+
+```sh
+npm run recover -- --email owner@example.com
+# Docker:
+docker compose exec openqr npm run recover -- --email owner@example.com
+```
+
+Use the same DATA_DIR and PUBLIC_URL as the running instance. Share the printed link privately with the account owner, who chooses their new password. Recovery links expire after 30 minutes, are stored only as hashes, work once, and replace earlier recovery links. A successful reset signs out every session and requires a new sign-in. Invitation and recovery secrets use URL fragments and are removed from the browser address bar after loading. An operator-issued link grants password-reset access: server/database access is a trusted administrative boundary.
+
+New and changed passwords use versioned scrypt with N=32768, r=8, p=3 and a random salt. Legacy hashes continue to verify until a password change or recovery. Email-address changes, self-service email recovery, two-factor authentication, and SSO are not implemented in v0.3.
 
 ## Designer and hosted pages
 
@@ -66,7 +105,7 @@ npm run dev
 
 On Windows PowerShell, use `Copy-Item .env.example .env` instead of `cp` if preferred. Open **http://localhost:5173** and create the owner account. The API runs on port 3001; Vite proxies API and redirect requests to it. Use `localhost`, matching `PUBLIC_URL`, rather than `127.0.0.1` when opening the app.
 
-The first account claims the instance. Public registration is disabled. Claim your instance on a trusted local connection before exposing it publicly.
+The first account claims the instance and owns its initial workspace. Further signup requires an invitation; public registration is disabled. Claim your instance on a trusted local connection before exposing it publicly.
 
 ## Production
 
@@ -112,6 +151,10 @@ src/                React interface and browser helpers
 src/components/     Editor, designer, bulk workflows, analytics and dialogs
 shared/             Shared SVG renderer and calendar payload encoding
 server/app.js       Express app, auth, base SQLite schema and folders
+server/auth.js      Accounts, sessions, invitations and recovery flows
+server/workspaces.js Workspace migration, membership, roles and activity
+server/security.js Shared password, authorization and transaction helpers
+server/manage.js   Operator-only recovery command
 server/codes.js     Migrations, codes, campaigns, templates and analytics
 server/design.js    Logo sanitization, SVG/PNG rendering
 server/pages.js     Safe public mobile pages
@@ -134,7 +177,7 @@ Back up your complete DATA_DIR and preserve your public domain. Stop the server 
 
 ## Scope and roadmap
 
-v0.2 is a working single-owner workspace, not complete feature parity with a commercial SaaS. The [competitive roadmap](docs/ROADMAP.md) covers team roles, account recovery, custom domains, file/media pages, API keys, routing rules, audit logs, and production hosting. Billing and subscription limits are outside this self-hosted edition. A private GitHub repository stays private; the MIT license does not automatically publish its contents.
+v0.3 supports multiple workspaces and invited teams on a single self-hosted SQLite instance. The [competitive roadmap](docs/ROADMAP.md) covers custom domains, file/media pages, API keys, routing rules, automated backups, PostgreSQL-backed hosted operations, and further hardening. Billing and subscription limits are outside this self-hosted edition. A private GitHub repository stays private; the MIT license does not automatically publish its contents.
 
 ## Open source
 

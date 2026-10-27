@@ -2,29 +2,15 @@ import express from "express";
 import helmet from "helmet";
 import { rateLimit } from "express-rate-limit";
 import { DatabaseSync } from "node:sqlite";
-import {
-  randomBytes,
-  randomUUID,
-  scrypt,
-  timingSafeEqual,
-  createHash,
-} from "node:crypto";
-import { promisify } from "node:util";
+import { randomBytes, randomUUID } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { z } from "zod";
 import { migrateCodes, registerCodeRoutes } from "./codes.js";
 
-const hashPassword = promisify(scrypt);
-const digest = (value) => createHash("sha256").update(value).digest("hex");
-const authSchema = z.object({
-  email: z
-    .email()
-    .max(254)
-    .transform((v) => v.toLowerCase()),
-  password: z.string().min(12).max(128),
-  name: z.string().trim().min(1).max(80).optional(),
-});
+import { migrateWorkspaces, registerWorkspaceRoutes } from "./workspaces.js";
+import { registerAuth } from "./auth.js";
+import { access, problem } from "./security.js";
 
 export function createApp({
   dbPath,
@@ -47,7 +33,13 @@ export function createApp({
     CREATE INDEX IF NOT EXISTS scans_code_date ON scans(code_id, scanned_at);
     CREATE INDEX IF NOT EXISTS codes_owner ON codes(user_id);
     CREATE TABLE IF NOT EXISTS config (key TEXT PRIMARY KEY, value TEXT NOT NULL);`);
-  migrateCodes(db);
+  try {
+    migrateCodes(db);
+    migrateWorkspaces(db);
+  } catch (error) {
+    db.close();
+    throw error;
+  }
   db.prepare("INSERT OR IGNORE INTO config VALUES (?,?)").run(
     "analytics_salt",
     randomBytes(32).toString("hex"),
@@ -99,116 +91,53 @@ export function createApp({
       message: { error: "Too many requests. Please wait a moment." },
     }),
   );
+  const { requireAuth } = registerAuth(
+    app,
+    db,
+    origin,
+    secureCookie,
+    authLimit,
+  );
+  app.use("/api", requireAuth);
+  registerWorkspaceRoutes(app, db, origin);
   app.use("/api", (req, _res, next) => {
-    const token = req.headers.cookie
-      ?.split(";")
-      .map((v) => v.trim())
-      .find((v) => v.startsWith("openqr_session="))
-      ?.slice(15);
-    if (token)
-      req.user = db
-        .prepare(
-          "SELECT u.id,u.email,u.name FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token=? AND s.expires>?",
-        )
-        .get(digest(token), Date.now());
-    next();
-  });
-  const session = (res, id) => {
-    const token = randomBytes(32).toString("hex");
-    db.prepare("DELETE FROM sessions WHERE expires<?").run(Date.now());
-    db.prepare("INSERT INTO sessions VALUES (?,?,?)").run(
-      digest(token),
-      id,
-      Date.now() + 7 * 86400000,
-    );
-    res.cookie("openqr_session", token, {
-      httpOnly: true,
-      sameSite: "strict",
-      secure: secureCookie,
-      maxAge: 7 * 86400000,
-      path: "/",
-    });
-  };
-  app.get("/api/health", (_req, res) => res.json({ ok: true }));
-  app.get("/api/auth/status", (req, res) =>
-    res.json({
-      setupRequired: !db.prepare("SELECT id FROM users LIMIT 1").get(),
-      user: req.user || null,
-      publicUrl: origin,
-    }),
-  );
-  app.post("/api/auth/setup", authLimit, async (req, res) => {
-    if (db.prepare("SELECT id FROM users LIMIT 1").get())
-      return res
-        .status(409)
-        .json({ error: "This instance already has an owner. Please sign in." });
-    const parsed = authSchema.safeParse(req.body);
-    if (!parsed.success || !parsed.data.name)
-      return res.status(400).json({
-        error:
-          "Enter your name, a valid email, and a password of 12–128 characters.",
-      });
-    const { email, password, name } = parsed.data;
-    const salt = randomBytes(16).toString("hex");
-    const hash = (await hashPassword(password, salt, 64)).toString("hex");
-    // Claim the instance atomically after the asynchronous password hash.
-    const id = randomUUID();
-    const result = db
-      .prepare(
-        "INSERT INTO users SELECT ?,?,?,?,? WHERE NOT EXISTS (SELECT 1 FROM users)",
+    if (!req.workspace)
+      throw problem("Choose or create a workspace first.", 403);
+    const workspaceId = req.workspace.id;
+    const liveSession = () => {
+      if (
+        !db
+          .prepare(
+            "SELECT 1 FROM sessions WHERE token=? AND user_id=? AND expires>?",
+          )
+          .get(req.sessionId, req.user.id, Date.now())
       )
-      .run(id, email, name, salt, hash);
-    if (!result.changes)
-      return res
-        .status(409)
-        .json({ error: "An owner already claimed this instance." });
-    session(res, id);
-    res.status(201).json({ id, email, name });
-  });
-  app.post("/api/auth/login", authLimit, async (req, res) => {
-    const parsed = authSchema.safeParse(req.body);
-    if (!parsed.success)
-      return res
-        .status(400)
-        .json({ error: "Enter a valid email and password." });
-    const user = db
-      .prepare("SELECT * FROM users WHERE email=?")
-      .get(parsed.data.email);
-    const hash = await hashPassword(
-      parsed.data.password,
-      user?.salt || "invalid-account-salt",
-      64,
-    );
-    if (!user || !timingSafeEqual(hash, Buffer.from(user.password, "hex")))
-      return res.status(401).json({ error: "Email or password is incorrect." });
-    session(res, user.id);
-    res.json({ id: user.id, name: user.name, email: user.email });
-  });
-  app.use("/api", (req, res, next) =>
-    req.user ? next() : res.status(401).json({ error: "Please sign in." }),
-  );
-  app.post("/api/auth/logout", (req, res) => {
-    const token = req.headers.cookie
-      ?.split(";")
-      .map((v) => v.trim())
-      .find((v) => v.startsWith("openqr_session="))
-      ?.slice(15);
-    if (token)
-      db.prepare("DELETE FROM sessions WHERE token=?").run(digest(token));
-    res.clearCookie("openqr_session", {
-      path: "/",
-      httpOnly: true,
-      sameSite: "strict",
-      secure: secureCookie,
-    });
-    res.json({ ok: true });
+        throw problem("Please sign in again.", 401);
+    };
+    req.assertRead = () => {
+      liveSession();
+      return access(db, req.user.id, workspaceId);
+    };
+    req.assertEdit = () => {
+      liveSession();
+      return access(db, req.user.id, workspaceId, "edit");
+    };
+    req.assertRead();
+    if (
+      !["GET", "HEAD", "OPTIONS"].includes(req.method) &&
+      !(req.method === "POST" && req.path === "/codes/export")
+    )
+      req.assertEdit();
+    next();
   });
   registerCodeRoutes(app, db, origin, analyticsSalt);
   app.get("/api/folders", (req, res) =>
     res.json(
       db
-        .prepare("SELECT id,name FROM folders WHERE user_id=? ORDER BY name")
-        .all(req.user.id),
+        .prepare(
+          "SELECT id,name FROM folders WHERE workspace_id=? ORDER BY name",
+        )
+        .all(req.workspace.id),
     ),
   );
   app.post("/api/folders", (req, res) => {
@@ -216,19 +145,21 @@ export function createApp({
     const id = randomUUID();
     if (
       db
-        .prepare("SELECT id FROM folders WHERE user_id=? AND name=?")
-        .get(req.user.id, name)
+        .prepare("SELECT id FROM folders WHERE workspace_id=? AND name=?")
+        .get(req.workspace.id, name)
     )
       return res
         .status(409)
         .json({ error: "A folder with that name already exists." });
-    db.prepare("INSERT INTO folders VALUES (?,?,?)").run(id, req.user.id, name);
+    db.prepare(
+      "INSERT INTO folders (id,user_id,name,workspace_id) VALUES (?,?,?,?)",
+    ).run(id, req.user.id, name, req.workspace.id);
     res.status(201).json({ id, name });
   });
   app.delete("/api/folders/:id", (req, res) => {
-    db.prepare("DELETE FROM folders WHERE id=? AND user_id=?").run(
+    db.prepare("DELETE FROM folders WHERE id=? AND workspace_id=?").run(
       req.params.id,
-      req.user.id,
+      req.workspace.id,
     );
     res.json({ ok: true });
   });

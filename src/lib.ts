@@ -45,6 +45,25 @@ export type Code = {
 };
 export type Folder = { id: string; name: string };
 export type User = { id: string; name: string; email: string };
+export type Role = "owner" | "admin" | "editor" | "viewer";
+export type Workspace = {
+  id: string;
+  name: string;
+  ownerId: string;
+  role: Role;
+};
+export type AuthState = {
+  setupRequired: boolean;
+  user: User | null;
+  publicUrl: string;
+  workspace: Workspace | null;
+  workspaces: Workspace[];
+};
+export type Member = User & { role: Role; joinedAt: string };
+export const mayEdit = (role?: Role) =>
+  ["owner", "admin", "editor"].includes(role || "");
+export const mayManage = (role?: Role) =>
+  ["owner", "admin"].includes(role || "");
 export type Analytics = {
   total: number;
   uniqueDailyVisitors: number;
@@ -69,6 +88,8 @@ export async function api<T>(
   });
   const data = await res.json();
   if (!res.ok) {
+    if (res.status === 403)
+      window.dispatchEvent(new Event("permissions-changed"));
     if (res.status === 401 && !path.startsWith("/auth/"))
       window.dispatchEvent(new Event("session-expired"));
     throw new Error(data.error || "Request failed.");

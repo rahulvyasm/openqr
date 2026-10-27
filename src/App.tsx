@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Activity,
   ArrowDownToLine,
@@ -6,20 +6,16 @@ import {
   ArrowUpRight,
   BarChart3,
   CheckCircle2,
-  ChevronDown,
   Code2,
   Copy,
   Download,
   Ellipsis,
   Folder as FolderIcon,
   FolderPlus,
-  Globe,
   LayoutGrid,
   Leaf,
   List,
   Loader2,
-  LockKeyhole,
-  LogOut,
   Menu,
   MousePointer2,
   Pause,
@@ -48,10 +44,18 @@ import {
   type Code,
   type DesignTemplate,
   type Folder,
-  type User,
+  type AuthState,
+  mayEdit,
 } from "./lib";
 import "./styles.css";
 import "./advanced.css";
+import "./team.css";
+import AccessFlow, {
+  readAccessLink,
+  type AccessLink,
+} from "./components/AccessFlow";
+import WorkspaceSwitcher from "./components/WorkspaceSwitcher";
+import SettingsView from "./components/SettingsView";
 import Modal from "./components/Modal";
 import QrImage from "./components/QrImage";
 import Editor from "./components/Editor";
@@ -85,6 +89,7 @@ function Brand() {
   );
 }
 function Auth({ setup, onSuccess }: { setup: boolean; onSuccess: () => void }) {
+  const [recoveryHelp, setRecoveryHelp] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   async function submit(e: React.FormEvent<HTMLFormElement>) {
@@ -198,6 +203,35 @@ function Auth({ setup, onSuccess }: { setup: boolean; onSuccess: () => void }) {
               )}
             </button>
           </form>
+          {!setup && (
+            <button
+              className="text-button forgot-password"
+              onClick={() => setRecoveryHelp(true)}
+            >
+              Forgot your password?
+            </button>
+          )}
+          {recoveryHelp && (
+            <Modal
+              title="Let’s get you back in."
+              onClose={() => setRecoveryHelp(false)}
+            >
+              <div className="simple-form">
+                <p>
+                  Ask your OpenQR server operator for a password recovery link.
+                  The link works once and expires in 30 minutes. If you run this
+                  server, follow the account recovery instructions in the
+                  project README.
+                </p>
+                <button
+                  className="button primary full"
+                  onClick={() => setRecoveryHelp(false)}
+                >
+                  Got it
+                </button>
+              </div>
+            </Modal>
+          )}
           <div className="auth-note">
             <ShieldCheck size={17} />
             <span>Self-hosted. No subscriptions. No scan limits.</span>
@@ -291,11 +325,12 @@ function ScanChart({ analytics }: { analytics: Analytics | null }) {
   );
 }
 export default function App() {
-  const [auth, setAuth] = useState<{
-    setupRequired: boolean;
-    user: User | null;
-    publicUrl: string;
-  } | null>(null);
+  const [auth, setAuth] = useState<AuthState | null>(null);
+  const [accessLink, setAccessLink] = useState<AccessLink | null>(
+    readAccessLink,
+  );
+  const generation = useRef(0);
+  const scopeId = useRef("");
   const [bootError, setBootError] = useState("");
   const [codes, setCodes] = useState<Code[]>([]);
   const [folders, setFolders] = useState<Folder[]>([]);
@@ -323,23 +358,44 @@ export default function App() {
   const [selection, setSelection] = useState<string[]>([]);
   const [download, setDownload] = useState<Code | null>(null);
   const [pageNumber, setPageNumber] = useState(1);
-  const loadTemplates = () =>
-    api<DesignTemplate[]>("/templates")
-      .then(setTemplates)
-      .catch((e) => notify(e.message));
+  const loadTemplates = () => {
+    const run = generation.current;
+    return api<DesignTemplate[]>("/templates")
+      .then((data) => {
+        if (run === generation.current) setTemplates(data);
+      })
+      .catch((e) => {
+        if (run === generation.current) notify(e.message);
+      });
+  };
   const notify = (text: string) => setToast(text);
   const loadAuth = () =>
-    api<{ setupRequired: boolean; user: User | null; publicUrl: string }>(
-      "/auth/status",
-    )
-      .then(setAuth)
+    api<AuthState>("/auth/status")
+      .then((data) => {
+        const scope = `${data.user?.id || ""}/${data.workspace?.id || ""}`;
+        if (scope !== scopeId.current) {
+          generation.current++;
+          scopeId.current = scope;
+          setCodes([]);
+          setFolders([]);
+          setTemplates([]);
+          setAnalytics(null);
+          setSelection([]);
+          setFolder("");
+          setDetail(null);
+          setEditor(null);
+        }
+        setAuth(data);
+      })
       .catch((e) => setBootError(e.message));
   const refresh = async () => {
+    const run = generation.current;
     try {
       const [c, f] = await Promise.all([
         api<Code[]>("/codes"),
         api<Folder[]>("/folders"),
       ]);
+      if (run !== generation.current) return;
       setCodes(c);
       setSelection((ids) =>
         ids.filter((id) => c.some((code) => code.id === id)),
@@ -349,23 +405,57 @@ export default function App() {
       notify((e as Error).message);
     }
   };
-  const loadAnalytics = () =>
-    api<Analytics>(`/analytics?days=${days}`)
-      .then(setAnalytics)
-      .catch((e) => notify(e.message));
+  const loadAnalytics = () => {
+    const run = generation.current;
+    return api<Analytics>(`/analytics?days=${days}`)
+      .then((data) => {
+        if (run === generation.current) setAnalytics(data);
+      })
+      .catch((e) => {
+        if (run === generation.current) notify(e.message);
+      });
+  };
   useEffect(() => {
     loadAuth();
     const expire = () => setAuth((a) => (a ? { ...a, user: null } : a));
     window.addEventListener("session-expired", expire);
-    return () => window.removeEventListener("session-expired", expire);
+    const reloadAuth = () => {
+      generation.current++;
+      setCodes([]);
+      setFolders([]);
+      setTemplates([]);
+      setAnalytics(null);
+      setEditor(null);
+      setSelection([]);
+      loadAuth();
+    };
+    const fromHash = () => {
+      const link = readAccessLink();
+      if (link) {
+        setAccessLink(link);
+        window.history.replaceState(
+          null,
+          "",
+          window.location.pathname + window.location.search,
+        );
+      }
+    };
+    fromHash();
+    window.addEventListener("hashchange", fromHash);
+    window.addEventListener("permissions-changed", reloadAuth);
+    return () => {
+      window.removeEventListener("session-expired", expire);
+      window.removeEventListener("hashchange", fromHash);
+      window.removeEventListener("permissions-changed", reloadAuth);
+    };
   }, []);
   useEffect(() => {
-    if (auth?.user) {
+    if (auth?.user && auth.workspace) {
       refresh();
       loadAnalytics();
       loadTemplates();
     }
-  }, [auth?.user?.id, days]);
+  }, [auth?.user?.id, auth?.workspace?.id, auth?.workspace?.role, days]);
   useEffect(() => {
     if (!toast) return;
     const timer = setTimeout(() => setToast(""), 4000);
@@ -418,8 +508,48 @@ export default function App() {
         <Loader2 className="spin" />
       </div>
     );
+  if (accessLink)
+    return (
+      <AccessFlow
+        link={accessLink}
+        user={auth.user}
+        onAuthChange={loadAuth}
+        onDone={() => {
+          setAccessLink(null);
+          setPage("codes");
+          loadAuth();
+        }}
+      />
+    );
   if (!auth.user)
     return <Auth setup={auth.setupRequired} onSuccess={loadAuth} />;
+  const canEdit = mayEdit(auth.workspace?.role);
+  const workspaceChanged = () => {
+    generation.current++;
+    setCodes([]);
+    setFolders([]);
+    setAnalytics(null);
+    setTemplates([]);
+    setSelection([]);
+    setFolder("");
+    setEditor(null);
+    setDetail(null);
+    setPage("codes");
+    loadAuth();
+  };
+  const signOut = async () => {
+    try {
+      await api("/auth/logout", {});
+      generation.current++;
+      setCodes([]);
+      setFolders([]);
+      setAnalytics(null);
+      setTemplates([]);
+      loadAuth();
+    } catch (e) {
+      notify((e as Error).message);
+    }
+  };
   const totalScans = codes.reduce((n, c) => n + c.scans, 0);
   const active = codes.filter(
     (c) =>
@@ -539,19 +669,12 @@ export default function App() {
       )}
       <aside className={`sidebar ${mobileNav ? "is-open" : ""}`}>
         <Brand />
-        <button
-          className="workspace-switch"
-          onClick={() => navigate("settings")}
-        >
-          <span className="workspace-avatar">
-            {auth.user.name[0].toUpperCase()}
-          </span>
-          <span>
-            <strong>My workspace</strong>
-            <small>Personal workspace</small>
-          </span>
-          <ChevronDown size={15} />
-        </button>
+        <WorkspaceSwitcher
+          workspace={auth.workspace}
+          workspaces={auth.workspaces}
+          onChange={workspaceChanged}
+          notify={notify}
+        />
         <span className="nav-label">WORKSPACE</span>
         <nav>
           <button
@@ -584,6 +707,7 @@ export default function App() {
           <span>FOLDERS</span>
           <button
             aria-label="Add folder"
+            disabled={!canEdit}
             className="icon-button"
             onClick={() => {
               setFolderError("");
@@ -609,6 +733,7 @@ export default function App() {
           ) : (
             <button
               className="empty-folder"
+              disabled={!canEdit}
               onClick={() => setFolderModal(true)}
             >
               <FolderPlus size={17} />
@@ -648,7 +773,7 @@ export default function App() {
             </span>
             <span>
               <strong>{auth.user.name}</strong>
-              <small>Workspace owner</small>
+              <small>{auth.workspace?.role || "Account"} access</small>
             </span>
             <Ellipsis size={18} />
           </button>
@@ -675,8 +800,17 @@ export default function App() {
           </span>
         </header>
         <main className="main-content">
-          {page === "designs" ? (
+          {!auth.workspace && page !== "settings" ? (
+            <section className="settings-panel workspace-welcome">
+              <h2>A fresh workspace awaits.</h2>
+              <p>
+                Open the workspace menu to create a place for your next idea.
+                Your account settings are always available.
+              </p>
+            </section>
+          ) : page === "designs" ? (
             <DesignStudio
+              canEdit={canEdit}
               templates={templates}
               onCreate={(t) => {
                 setInitialDesign(t);
@@ -686,70 +820,12 @@ export default function App() {
               notify={notify}
             />
           ) : page === "settings" ? (
-            <>
-              <div className="page-heading">
-                <div>
-                  <span className="eyebrow">MAKE IT YOURS</span>
-                  <h1>
-                    Workspace settings<span>.</span>
-                  </h1>
-                  <p>A home for your codes. Owned by you.</p>
-                </div>
-              </div>
-              <section className="settings-card">
-                <div className="section-heading">
-                  <h2>Your workspace</h2>
-                  <ShieldCheck size={20} />
-                </div>
-                <dl>
-                  <dt>Owner</dt>
-                  <dd>{auth.user.name}</dd>
-                  <dt>Email</dt>
-                  <dd>{auth.user.email}</dd>
-                  <dt>Public URL</dt>
-                  <dd>{auth.publicUrl}</dd>
-                  <dt>License</dt>
-                  <dd>MIT · Open source</dd>
-                  <dt>Storage</dt>
-                  <dd>Self-hosted SQLite</dd>
-                </dl>
-                <div className="info-note">
-                  <LockKeyhole size={19} />
-                  <p>
-                    QR codes and scan data stay on your server. Dynamic codes
-                    need this server to remain online. Set a permanent public
-                    URL before printing.
-                  </p>
-                </div>
-                {/localhost|127\.0\.0\.1/.test(auth.publicUrl) && (
-                  <div className="info-note amber">
-                    <Globe size={19} />
-                    <p>
-                      This workspace uses a local URL. To scan dynamic codes
-                      with a phone, configure PUBLIC_URL to a reachable address
-                      and restart the server.
-                    </p>
-                  </div>
-                )}
-                <button
-                  className="button secondary"
-                  onClick={async () => {
-                    try {
-                      await api("/auth/logout", {});
-                      setCodes([]);
-                      setFolders([]);
-                      setAnalytics(null);
-                      loadAuth();
-                    } catch (e) {
-                      notify((e as Error).message);
-                    }
-                  }}
-                >
-                  <LogOut size={16} />
-                  Sign out
-                </button>
-              </section>
-            </>
+            <SettingsView
+              auth={auth}
+              onAuthChange={loadAuth}
+              onSignOut={signOut}
+              notify={notify}
+            />
           ) : (
             <>
               <div className="page-heading">
@@ -773,27 +849,33 @@ export default function App() {
                       : "Create, manage, and see where your QR codes take people."}
                   </p>
                 </div>
-                <div className="heading-actions">
-                  {page === "codes" && (
+                {canEdit ? (
+                  <div className="heading-actions">
+                    {page === "codes" && (
+                      <button
+                        className="button secondary"
+                        onClick={() => setBulkOpen(true)}
+                      >
+                        <Upload size={16} />
+                        Import CSV
+                      </button>
+                    )}
                     <button
-                      className="button secondary"
-                      onClick={() => setBulkOpen(true)}
+                      className="button primary create-main"
+                      onClick={() => {
+                        setInitialDesign(undefined);
+                        setEditor("new");
+                      }}
                     >
-                      <Upload size={16} />
-                      Import CSV
+                      <Plus size={18} />
+                      Create QR code
                     </button>
-                  )}
-                  <button
-                    className="button primary create-main"
-                    onClick={() => {
-                      setInitialDesign(undefined);
-                      setEditor("new");
-                    }}
-                  >
-                    <Plus size={18} />
-                    Create QR code
-                  </button>
-                </div>
+                  </div>
+                ) : (
+                  <span className="viewer-notice">
+                    Viewer access · Browse and download
+                  </span>
+                )}
               </div>
               <section className="stats-grid">
                 <div className="stat-card">
@@ -990,6 +1072,7 @@ export default function App() {
                   </div>
                   {selection.length > 0 && (
                     <BatchBar
+                      canEdit={canEdit}
                       ids={selection}
                       codes={codes}
                       folders={folders}
@@ -1023,6 +1106,7 @@ export default function App() {
                       </p>
                       <button
                         className="button primary"
+                        disabled={!canEdit && !search}
                         onClick={() =>
                           search ? setSearch("") : setEditor("new")
                         }
@@ -1172,15 +1256,17 @@ export default function App() {
                                     className="dropdown"
                                     onClick={(e) => e.stopPropagation()}
                                   >
-                                    <button
-                                      onClick={() => {
-                                        setEditor(code);
-                                        setMenu("");
-                                      }}
-                                    >
-                                      <Pencil size={15} />
-                                      Edit code
-                                    </button>
+                                    {canEdit && (
+                                      <button
+                                        onClick={() => {
+                                          setEditor(code);
+                                          setMenu("");
+                                        }}
+                                      >
+                                        <Pencil size={15} />
+                                        Edit code
+                                      </button>
+                                    )}
                                     <button
                                       onClick={() => {
                                         copy(code);
@@ -1199,6 +1285,7 @@ export default function App() {
                                       Download SVG
                                     </a>
                                     <button
+                                      disabled={!canEdit}
                                       onClick={async () => {
                                         try {
                                           await api(
@@ -1239,6 +1326,7 @@ export default function App() {
                                           Scan analytics
                                         </button>
                                         <button
+                                          disabled={!canEdit}
                                           onClick={() => {
                                             toggle(code);
                                             setMenu("");
@@ -1256,6 +1344,7 @@ export default function App() {
                                     )}
                                     <button
                                       className="danger"
+                                      disabled={!canEdit}
                                       onClick={() => {
                                         setDeleteTarget(code);
                                         setMenu("");

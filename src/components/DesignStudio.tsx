@@ -3,11 +3,13 @@ import { api, type DesignTemplate } from "../lib";
 import QrImage from "./QrImage";
 import { presets } from "./DesignControls";
 export default function DesignStudio({
+  canEdit,
   templates,
   onCreate,
   onRefresh,
   notify,
 }: {
+  canEdit: boolean;
   templates: DesignTemplate[];
   onCreate: (t: DesignTemplate) => void;
   onRefresh: () => void;
@@ -69,6 +71,7 @@ export default function DesignStudio({
               </p>
               <button
                 className="button secondary small"
+                disabled={!canEdit}
                 onClick={() => onCreate({ ...t, id: `preset-${i}` })}
               >
                 Make it yours
@@ -102,6 +105,7 @@ export default function DesignStudio({
                 <div className="saved-design-actions">
                   <button
                     className="button secondary small"
+                    disabled={!canEdit}
                     onClick={() => onCreate(t)}
                   >
                     Use design
@@ -110,6 +114,7 @@ export default function DesignStudio({
                   <button
                     className="icon-button"
                     title="Remove saved design (existing codes keep their design)"
+                    disabled={!canEdit}
                     aria-label={`Remove saved design ${t.name}`}
                     onClick={async () => {
                       try {

@@ -19,17 +19,22 @@ QRCG's [official feature overview](https://www.qr-code-generator.com/features/) 
 | Analytics     | Daily scans/unique estimates, devices, browser/OS, referrer hosts, top codes             |
 | Continuity    | Migration preserves existing short links and scans; static codes remain independent      |
 
-## Next: team and production foundation
+## Delivered in v0.3
+
+- Workspace isolation across QR codes, folders, designs, analytics, downloads, and bulk operations.
+- Owner/Admin/Editor/Viewer roles, invited-account signup, expiring single-use links, renewal/revocation, and role-aware controls.
+- Password-confirmed ownership transfer, profile/password updates, session management, and operator-managed password recovery.
+- Account/team security activity logs without live tokens or passwords.
+- Transactional migration preserving old folder references, designs, sessions, password hashes, and printed links.
+
+## Next: production operations
 
 Build this before presenting OpenQR as a public multi-tenant service.
 
-- Workspaces with owner/admin/editor/viewer roles. Each API and download must verify workspace membership; guests cannot access codes by guessing identifiers.
-- Single-use, expiring invitations with revocation. Expose invite delivery status and a manual copy-link path; do not require a particular email vendor.
-- Owner password recovery via an operator-managed flow, session revocation, profile/password updates, and an audit trail for sensitive actions.
-- Schema migrations with explicit version tracking and rollback guidance, automated database backups, and tested restore procedures.
+- Automated database backups, tested restore procedures, and improved operational rollback tooling. Schema versions and transactional migrations are already in place.
 - Production configuration checks, health/readiness endpoints, and deployment tests. Choose PostgreSQL for a shared hosted service; keep a supported SQLite path for a single-instance self-hosted installation.
 
-Acceptance: cross-workspace authorization tests pass for every resource; invitations cannot be reused; restoring a backup preserves printed links and scan counts.
+Acceptance: restoring a backup preserves printed links, workspace memberships, and scan counts. Keep the existing cross-workspace/role, invitation-reuse, and legacy-migration checks passing.
 
 ## Then: publishing and integrations
 

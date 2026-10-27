@@ -4,6 +4,7 @@ import { Download, Loader2, Pause, Play, Trash2, X } from "lucide-react";
 import { api, downloadBatch, saveBlob, type Code, type Folder } from "../lib";
 import Modal from "./Modal";
 export default function BatchBar({
+  canEdit,
   ids,
   codes,
   folders,
@@ -11,6 +12,7 @@ export default function BatchBar({
   onDone,
   notify,
 }: {
+  canEdit: boolean;
   ids: string[];
   codes: Code[];
   folders: Folder[];
@@ -50,41 +52,48 @@ export default function BatchBar({
         <span className="selected-count">{ids.length}</span>selected
       </label>
       <div className="batch-actions">
-        <select
-          aria-label="Move selected codes to folder"
-          value=""
-          disabled={busy}
-          onChange={(e) =>
-            action("move", e.target.value === "none" ? null : e.target.value)
-          }
-        >
-          <option value="" disabled>
-            Move to folder…
-          </option>
-          <option value="none">No folder</option>
-          {folders.map((f) => (
-            <option key={f.id} value={f.id}>
-              {f.name}
-            </option>
-          ))}
-        </select>
-        <button
-          title="Pause selected dynamic links"
-          aria-label="Pause selected dynamic links"
-          disabled={busy}
-          onClick={() => action("pause")}
-        >
-          <Pause size={15} />
-        </button>
-        <button
-          title="Resume selected dynamic links"
-          aria-label="Resume selected dynamic links"
-          disabled={busy}
-          onClick={() => action("resume")}
-        >
-          <Play size={15} />
-        </button>
-        <span className="batch-divider" />
+        {canEdit && (
+          <>
+            <select
+              aria-label="Move selected codes to folder"
+              value=""
+              disabled={busy}
+              onChange={(e) =>
+                action(
+                  "move",
+                  e.target.value === "none" ? null : e.target.value,
+                )
+              }
+            >
+              <option value="" disabled>
+                Move to folder…
+              </option>
+              <option value="none">No folder</option>
+              {folders.map((f) => (
+                <option key={f.id} value={f.id}>
+                  {f.name}
+                </option>
+              ))}
+            </select>
+            <button
+              title="Pause selected dynamic links"
+              aria-label="Pause selected dynamic links"
+              disabled={busy}
+              onClick={() => action("pause")}
+            >
+              <Pause size={15} />
+            </button>
+            <button
+              title="Resume selected dynamic links"
+              aria-label="Resume selected dynamic links"
+              disabled={busy}
+              onClick={() => action("resume")}
+            >
+              <Play size={15} />
+            </button>
+            <span className="batch-divider" />
+          </>
+        )}
         <select
           aria-label="Batch download format"
           value={format}
@@ -139,17 +148,19 @@ export default function BatchBar({
         >
           CSV
         </button>
-        <button
-          aria-label="Delete selected codes"
-          className="danger"
-          disabled={busy}
-          onClick={() => {
-            setError("");
-            setConfirmDelete(true);
-          }}
-        >
-          <Trash2 size={15} />
-        </button>
+        {canEdit && (
+          <button
+            aria-label="Delete selected codes"
+            className="danger"
+            disabled={busy}
+            onClick={() => {
+              setError("");
+              setConfirmDelete(true);
+            }}
+          >
+            <Trash2 size={15} />
+          </button>
+        )}
         <button
           title="Clear selection"
           aria-label="Clear selection"
