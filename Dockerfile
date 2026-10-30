@@ -17,6 +17,7 @@ COPY --from=build --chown=node:node /app/package.json ./package.json
 RUN mkdir -p /app/data && chown node:node /app/data
 USER node
 EXPOSE 3001
-HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \n  CMD node -e "fetch('http://127.0.0.1:'+process.env.PORT+'/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+  CMD node -e "fetch('http://127.0.0.1:'+process.env.PORT+'/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 VOLUME ["/app/data"]
 CMD ["node", "server/index.js"]
