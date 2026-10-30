@@ -29,9 +29,21 @@ The same build works on any static host. **Check the host's terms first.** Verce
 3. Add the domain `openqr.riolet.si` under Project Settings → Domains.
 4. At your DNS provider for `riolet.si`, add a `CNAME` record: name `openqr`, value `cname.vercel-dns.com` (use the exact value Vercel shows). HTTPS is issued automatically.
 
-### Cloudflare Pages or Netlify
+### Cloudflare Pages (recommended, free for commercial use)
 
-Build command `npm run build:lite`, output directory `dist-lite`, Node 24. The `_headers` file in `lite/public` carries the same security headers.
+1. Sign in at <https://dash.cloudflare.com> (a free account is enough). Open **Workers & Pages → Create → Pages → Connect to Git**, authorise GitHub, and choose `rahulvyasm/openqr`.
+2. Production branch `main`. Framework preset **None**. Build command `npm run build:lite`. Build output directory `dist-lite`. Leave the root directory empty.
+3. Under **Environment variables** add `NODE_VERSION` = `24`. If the build image does not offer Node 24, use `22`: the lite build works on it (npm only warns about the `engines` field).
+4. If you use the early-access list, also add `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` (see below). Then **Save and Deploy**. The first build takes a few minutes and ends on a `https://PROJECT.pages.dev` address.
+5. Open that address and check `/` (generator) and `/demo/` (demo).
+6. **Custom domain:** in the project, **Custom domains → Set up a domain**, enter `openqr.riolet.si`. If `riolet.si` is not on Cloudflare DNS, Cloudflare shows a `CNAME` to add at your DNS provider: name `openqr`, target `PROJECT.pages.dev`. Add it, then press **Check DNS**. HTTPS is issued automatically, usually within minutes.
+7. Every push to `main` redeploys. Pull requests get preview addresses.
+
+The `_headers` file in `lite/public` sets the security headers and long-lived caching for hashed files.
+
+### Netlify
+
+Build command `npm run build:lite`, publish directory `dist-lite`, Node 24 (`NODE_VERSION`). The same `_headers` file applies.
 
 ## Early-access list (Supabase)
 
