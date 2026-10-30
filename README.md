@@ -203,6 +203,7 @@ An **Experience** is a hosted page you build from blocks: heading, text, image, 
 
 - **Draft, publish, restore:** edits autosave as a draft and visitors keep seeing the published version. Each publish is kept (last 50) and can be restored as a new draft.
 - **Forms:** submissions are stored in the workspace and shown in the Responses tab, with CSV export (spreadsheet formulas are neutralised) and per-response deletion. Forms use plain HTML posts with a short-lived ticket, a honeypot field and a per-IP rate limit, so pages need no scripts. Responses are deleted automatically after 365 days, and each page holds at most 10,000.
+- **Alerts:** with `SMTP_URL` set, owners can list up to three addresses in the Responses tab. The email only says a response arrived (never the answers) and is sent at most once every ten minutes per page.
 - **Results:** buttons and links go through a tracked redirect, so Studio shows scans next to taps and submissions. Only http(s), `tel:` and `mailto:` destinations are accepted.
 - **Privacy:** staff in the control room cannot read form responses; they are workspace data.
 - Images, videos and files must come from the workspace media library. A file used only by a draft or an older version is not protected from deletion; publishing re-checks every file.

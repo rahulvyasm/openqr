@@ -151,12 +151,8 @@ export function createApp({
     backupPolicy,
   });
   registerPlanAdminRoutes(app, db, entitlements);
-  registerSupportRoutes(
-    app,
-    db,
-    entitlements,
-    notifier || createNotifier(notifications, origin),
-  );
+  const alerts = notifier || createNotifier(notifications, origin);
+  registerSupportRoutes(app, db, entitlements, alerts);
   registerWorkspaceRoutes(app, db, origin, entitlements);
   app.use("/api", (req, _res, next) => {
     if (!req.workspace)
@@ -209,7 +205,7 @@ export function createApp({
     });
   });
   registerCodeRoutes(app, db, origin, analyticsSalt, storage, entitlements);
-  registerExperienceRoutes(app, db, origin, analyticsSalt);
+  registerExperienceRoutes(app, db, origin, analyticsSalt, alerts);
   app.get("/api/folders", (req, res) =>
     res.json(
       db

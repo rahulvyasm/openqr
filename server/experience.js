@@ -37,7 +37,14 @@ const csvCell = (value) => {
   return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 };
 
-export function registerExperienceRoutes(app, db, origin, analyticsSalt) {
+export function registerExperienceRoutes(
+  app,
+  db,
+  origin,
+  analyticsSalt,
+  notifier,
+) {
+  const lastAlert = new Map();
   const owned = (req) => {
     const row = db
       .prepare(
@@ -86,6 +93,34 @@ export function registerExperienceRoutes(app, db, origin, analyticsSalt) {
   const mediaFor = (assetId) => `/api/assets/${encodeURIComponent(assetId)}/content`;
   const pageOptions = (row) => JSON.parse(row.page_options || "{}");
 
+  const emails = (data) =>
+    String(data.alertEmails || "")
+      .split(",")
+      .map((e) => e.trim())
+      .filter(Boolean);
+  app.get("/api/codes/:id/experience/alerts", (req, res) =>
+    res.json({
+      available: !!notifier?.canEmail,
+      emails: emails(JSON.parse(owned(req).data)),
+    }),
+  );
+  app.put("/api/codes/:id/experience/alerts", (req, res) => {
+    const row = owned(req),
+      input = z
+        .object({ emails: z.array(z.email().max(200)).max(3) })
+        .safeParse(req.body);
+    if (!input.success)
+      throw problem("Enter up to three valid email addresses.");
+    const data = {
+      ...JSON.parse(row.data),
+      alertEmails: [...new Set(input.data.emails)].join(","),
+    };
+    db.prepare("UPDATE codes SET data=? WHERE id=?").run(
+      JSON.stringify(data),
+      row.id,
+    );
+    res.json({ ok: true, emails: emails(data) });
+  });
   app.get("/api/experience/templates", (_req, res) => res.json(templates()));
   app.post("/api/experience/preview", (req, res) => {
     const input = z
@@ -458,6 +493,14 @@ export function registerExperienceRoutes(app, db, origin, analyticsSalt) {
         row.id,
         new Date(now - RETENTION_DAYS * 86400000).toISOString(),
       );
+      const to = notifier?.canEmail ? emails(data) : [];
+      // One alert per page every ten minutes keeps a busy form from flooding inboxes.
+      if (to.length && Date.now() - (lastAlert.get(row.id) || 0) > 600000) {
+        lastAlert.set(row.id, Date.now());
+        notifier
+          .formAlert(to, data.title || row.name, block.title, `${origin}/`)
+          ?.catch?.(() => {});
+      }
       page({ sent: block.id });
     },
   );

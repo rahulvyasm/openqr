@@ -390,7 +390,12 @@ export function registerCodeRoutes(
         // Page content has its own draft and publish flow in Experience Studio.
         if (old.type === "experience") {
           const live = JSON.parse(old.data);
-          c.data = { ...c.data, title: live.title, blocks: live.blocks };
+          c.data = {
+            ...c.data,
+            title: live.title,
+            blocks: live.blocks,
+            alertEmails: live.alertEmails || "",
+          };
         }
         validateAssetReferences(db, c.data, req.workspace.id, c.type);
         db.prepare(

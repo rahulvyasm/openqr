@@ -429,3 +429,21 @@
   min-width: 0;
   width: 100%;
 }
+.xs-alerts {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px 10px;
+  align-items: end;
+  padding: 14px 16px;
+  border: 1px solid var(--rule);
+  border-radius: 12px;
+  background: var(--raised);
+}
+.xs-alerts label {
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+}
+.xs-alerts small {
+  grid-column: 1 / -1;
+}

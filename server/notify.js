@@ -31,6 +31,17 @@ export function createNotifier(options = {}, publicUrl = "") {
       : Promise.resolve();
   return {
     enabled: !!(mailer || webhookUrl),
+    canEmail: !!mailer,
+    // Tells a page owner a form was answered. Answers are never included.
+    formAlert: (emails, page, form, url) =>
+      mail(
+        emails,
+        `New response on ${page}`,
+        `Someone answered "${form}" on your OpenQR page "${page}".
+
+Open it to read the response: ${url}
+`,
+      ),
     // Resolves when delivery was attempted; never rejects.
     customerReply: (email, number) =>
       mail(

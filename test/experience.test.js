@@ -183,3 +183,40 @@ test("experiences render, track actions, collect responses and version", async (
       tpl.name,
     );
 });
+
+test("form alerts email the owner without answers and are throttled", async (t) => {
+  const sent = [];
+  const notifier = {
+    enabled: true,
+    canEmail: true,
+    customerReply: async () => {},
+    staffAlert: async () => {},
+    formAlert: async (...args) => sent.push(args),
+  };
+  const { request, setup, base } = await fixture(t, ":memory:", { notifier });
+  await setup();
+  const code = await (await create(request)).json();
+  assert.equal(
+    (await request(`/api/codes/${code.id}/experience/alerts`, { method: "PUT", body: { emails: ["nope"] } })).status,
+    400,
+  );
+  const saved = await request(`/api/codes/${code.id}/experience/alerts`, {
+    method: "PUT",
+    body: { emails: ["owner@example.com"] },
+  });
+  assert.deepEqual((await saved.json()).emails, ["owner@example.com"]);
+  // Editing the code elsewhere keeps the alert setting.
+  const full = await (await request("/api/codes")).json();
+  const current = full.find((c) => c.id === code.id);
+  await request(`/api/codes/${code.id}`, {
+    method: "PUT",
+    body: { ...current, name: "Renamed", data: { title: "x", blocks: "[]" } },
+  });
+  const page = await (await fetch(`${base}/r/${code.slug}`)).text();
+  const ticket = ticketOf(page);
+  for (const n of [1, 2])
+    await post(base, `/r/${code.slug}/submit/form1`, { ticket, f_q1: `a${n}@example.com` });
+  assert.equal(sent.length, 1);
+  assert.deepEqual(sent[0][0], ["owner@example.com"]);
+  assert.doesNotMatch(JSON.stringify(sent[0]), /a1@example\.com/);
+});

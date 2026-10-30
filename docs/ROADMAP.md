@@ -113,7 +113,7 @@ The supplied QRCG screens also show coupons, feedback/ratings, and GS1 2D barcod
 ## Parked for later (experiences)
 
 - Adaptive rules (breakfast in the morning, directions after closing) with a preview for every rule.
-- Email or webhook alert to the owner when a form is submitted (the support notifier can be reused).
+- Webhook alerts for form submissions (email alerts shipped).
 - Per-item connected pages (product or asset with its own page, service history and warranty).
 - AI-drafted experiences from a short brief (needs a provider decision and key handling).
 - Drag-and-drop block ordering, a block for maps and hours, and file uploads inside forms.

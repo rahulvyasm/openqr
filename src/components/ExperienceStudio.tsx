@@ -519,6 +519,11 @@ export default function ExperienceStudio({
   const [versions, setVersions] = useState<Version[]>([]);
   const [subs, setSubs] = useState<Submission[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
+  const [alerts, setAlerts] = useState<{
+    available: boolean;
+    emails: string;
+  } | null>(null);
+  const [alertNote, setAlertNote] = useState("");
   const edited = useRef(false);
   const pending = useRef<ReturnType<typeof setTimeout> | null>(null);
   const path = `/codes/${code.id}/experience`;
@@ -534,6 +539,9 @@ export default function ExperienceStudio({
     if (tab === "history") api<Version[]>(`${path}/versions`).then(setVersions).catch(() => {});
     if (tab === "responses") {
       api<Submission[]>(`${path}/submissions`).then(setSubs).catch(() => {});
+      api<{ available: boolean; emails: string[] }>(`${path}/alerts`)
+        .then((a) => setAlerts({ available: a.available, emails: a.emails.join(", ") }))
+        .catch(() => {});
       if (editable) api(`${path}/submissions/read`, {}).catch(() => {});
     }
     if (tab === "results") api<Stats>(`${path}/stats`).then(setStats).catch(() => {});
@@ -614,6 +622,26 @@ export default function ExperienceStudio({
       setState("idle");
     } catch (e) {
       setError((e as Error).message);
+    }
+  }
+  async function saveAlerts() {
+    if (!alerts) return;
+    setAlertNote("");
+    try {
+      const r = await api<{ emails: string[] }>(
+        `${path}/alerts`,
+        {
+          emails: alerts.emails
+            .split(",")
+            .map((e) => e.trim())
+            .filter(Boolean),
+        },
+        "PUT",
+      );
+      setAlerts({ ...alerts, emails: r.emails.join(", ") });
+      setAlertNote(r.emails.length ? "Alerts saved." : "Alerts turned off.");
+    } catch (e) {
+      setAlertNote((e as Error).message);
     }
   }
   async function remove(id: number) {
@@ -785,6 +813,35 @@ export default function ExperienceStudio({
                 </a>
               )}
             </div>
+            {alerts && (
+              <div className="xs-alerts">
+                <label>
+                  Email me about new responses
+                  <input
+                    value={alerts.emails}
+                    disabled={!editable || !alerts.available}
+                    placeholder="you@example.com, up to three"
+                    onChange={(e) =>
+                      setAlerts({ ...alerts, emails: e.target.value })
+                    }
+                  />
+                </label>
+                <button
+                  type="button"
+                  className="button secondary small"
+                  disabled={!editable || !alerts.available}
+                  onClick={saveAlerts}
+                >
+                  Save
+                </button>
+                <small className="hint">
+                  {alerts.available
+                    ? alertNote ||
+                      "The email says a response arrived, never what it says. At most one every ten minutes."
+                    : "Email is not set up on this server. Ask the administrator to set SMTP_URL."}
+                </small>
+              </div>
+            )}
             <ul className="xs-list">
               {subs.map((s) => (
                 <li key={s.id} className={s.read ? "" : "new"}>
