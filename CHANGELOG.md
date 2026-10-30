@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.6.0 — 2026-10-30
+## 1.0.0 — 2026-10-30
 
 - Add **Experiences**: hosted pages built from blocks (heading, text, image, video, button, links, file, form, item details). Draft, publish and restore with up to 50 kept versions; a live phone preview; four starters (product companion, event welcome, business enquiry, guest feedback).
 - Forms collect responses without scripts: ticketed posts, a honeypot, per-address rate limits, duplicate suppression, CSV export that neutralises spreadsheet formulas, deletion, automatic expiry after 365 days, and optional email alerts that never include answers.
