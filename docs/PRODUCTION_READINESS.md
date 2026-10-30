@@ -56,7 +56,7 @@ OpenQR is designed to run as **one process with one SQLite database**. Most dist
 
 | Topic | Status | Notes |
 |---|---|---|
-| CI/CD | Done | GitHub Actions run tests, build, dependency audit, a Docker build with a readiness check, and CodeQL. Pushing a `v*` tag publishes an image and a release. |
+| CI/CD | Done | GitHub Actions run tests, build, dependency audit and a Docker build with a readiness check. CodeQL runs once the repository is public (code scanning is not available on private repositories without GitHub Advanced Security). Pushing a `v*` tag publishes an image and a release. |
 | Docker | Done | Multi-stage image, non-root user, volume for data. |
 | Kubernetes, Helm charts, Terraform / infrastructure as code | Later | The Compose file is the supported deployment. |
 | Build caching | Done | npm cache in CI; layered Dockerfile. |
