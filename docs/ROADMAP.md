@@ -102,3 +102,10 @@ Keep the repository's chosen visibility. Ship source changes only after tests an
 ## Remaining screenshot parity
 
 The supplied QRCG screens also show coupons, feedback/ratings, and GS1 2D barcodes (hosted events, galleries, audio/video, and app routing shipped in v0.5). These are still future work. GS1 needs standards-based identifier validation and Digital Link behavior; it is not a renamed URL code. Interactive pages need response storage, moderation, abuse controls, and deletion/export rules.
+
+## Parked for later (support and operations)
+
+- Verify real SMTP delivery of staff and customer support alerts with a test inbox.
+- Online payment collection (needs final INR prices and a payment provider such as Razorpay).
+- Track down intermittently failing media and publishing tests.
+- Support gaps: file or screenshot attachments on requests, merging duplicate cases, and reply-time targets.
