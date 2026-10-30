@@ -72,18 +72,18 @@ import CommandMenu from "./components/CommandMenu";
 import CampaignPulse from "./components/CampaignPulse";
 import ProfileMenu from "./components/ProfileMenu";
 import PlansView from "./components/PlansView";
+import Landing from "./components/Landing";
+import { pageIn, startMotion } from "./motion";
 import ScanChart from "./components/ScanChart";
 import "./studio.css";
+import "@fontsource-variable/bricolage-grotesque";
+import "@fontsource/geist/latin-400.css";
+import "@fontsource/geist/latin-500.css";
+import "@fontsource/geist/latin-600.css";
+import "@fontsource/geist-mono/latin-400.css";
+import "@fontsource/geist-mono/latin-500.css";
+import "./design.css";
 import { typeIcons as icons } from "./components/codeTypes";
-import "@fontsource/dm-sans/latin-400.css";
-import "@fontsource/dm-sans/latin-500.css";
-import "@fontsource/dm-sans/latin-600.css";
-import "@fontsource/dm-sans/latin-700.css";
-import "@fontsource/manrope/latin-400.css";
-import "@fontsource/manrope/latin-500.css";
-import "@fontsource/manrope/latin-600.css";
-import "@fontsource/manrope/latin-700.css";
-import "@fontsource/manrope/latin-800.css";
 const OperatorConsole = React.lazy(
   () => import("./components/OperatorConsole"),
 );
@@ -120,142 +120,105 @@ function Auth({ setup, onSuccess }: { setup: boolean; onSuccess: () => void }) {
     }
   }
   return (
-    <div className="auth-page">
-      <div className="auth-story">
-        <Brand />
-        <div className="auth-copy">
-          <span className="eyebrow">
-            <span className="tiny-dot" /> OPEN SOURCE. OPEN POSSIBILITIES.
-          </span>
-          <h1>
-            A small square.
-            <br />A world of
-            <br />
-            <em>connections.</em>
-          </h1>
-          <p>
-            Create beautiful QR codes. Keep your links flexible.
-            <br />
-            Make every connection count.
-          </p>
-          <div className="auth-art">
-            <div className="art-orbit orbit-one" />
-            <div className="art-orbit orbit-two" />
-            <div className="art-qr">
-              <QrImage content="https://example.com" size={164} />
+    <Landing setup={setup} brand={<Brand />}>
+      <div className="auth-form-wrap">
+        <span className="small-label">OPENQR / YOUR CONNECTION STUDIO</span>
+        <h2>{setup ? "Make yourself at home." : "Welcome back."}</h2>
+        <p>
+          {setup
+            ? "Create the owner account for your OpenQR workspace."
+            : "Sign in and pick up where you left off."}
+        </p>
+        <form onSubmit={submit}>
+          {setup && (
+            <label>
+              Your name
+              <input
+                name="name"
+                autoComplete="name"
+                placeholder="Alex Morgan"
+                required
+                maxLength={80}
+              />
+            </label>
+          )}
+          <label>
+            Email address
+            <input
+              type="email"
+              name="email"
+              autoComplete="email"
+              placeholder="you@example.com"
+              required
+            />
+          </label>
+          <label>
+            Password
+            <input
+              type="password"
+              name="password"
+              autoComplete={setup ? "new-password" : "current-password"}
+              placeholder={setup ? "At least 12 characters" : "Your password"}
+              required
+              minLength={12}
+              maxLength={128}
+            />
+          </label>
+          {error && (
+            <div className="form-error" role="alert">
+              {error}
             </div>
-            <span className="art-badge">
-              <Leaf size={16} /> Yours to build on
-            </span>
-            <span className="art-spark">✳</span>
-          </div>
+          )}
+          <button className="button primary full" disabled={busy}>
+            {busy ? (
+              <Loader2 size={18} className="spin" />
+            ) : (
+              <>
+                {setup ? "Create your workspace" : "Sign in"}
+                <ArrowRight size={18} />
+              </>
+            )}
+          </button>
+        </form>
+        {!setup && (
+          <button
+            className="text-button forgot-password"
+            onClick={() => setRecoveryHelp(true)}
+          >
+            Forgot your password?
+          </button>
+        )}
+        {recoveryHelp && (
+          <Modal
+            title="Let’s get you back in."
+            onClose={() => setRecoveryHelp(false)}
+          >
+            <div className="simple-form">
+              <p>
+                Ask your OpenQR server operator for a password recovery link.
+                The link works once and expires in 30 minutes. If you run this
+                server, follow the account recovery instructions in the project
+                README.
+              </p>
+              <button
+                className="button primary full"
+                onClick={() => setRecoveryHelp(false)}
+              >
+                Got it
+              </button>
+            </div>
+          </Modal>
+        )}
+        <div className="auth-note">
+          <ShieldCheck size={17} />
+          <span>Self-hosted. No subscriptions. No scan limits.</span>
         </div>
-        <span className="auth-footer">
-          Your codes. Your data. Your platform.
-        </span>
       </div>
-      <main className="auth-form-side">
-        <div className="auth-form-wrap">
-          <span className="small-label">OPENQR / YOUR CONNECTION STUDIO</span>
-          <h2>{setup ? "Make yourself at home." : "Welcome back."}</h2>
-          <p>
-            {setup
-              ? "Create the owner account for your OpenQR workspace."
-              : "Sign in and pick up where you left off."}
-          </p>
-          <form onSubmit={submit}>
-            {setup && (
-              <label>
-                Your name
-                <input
-                  name="name"
-                  autoComplete="name"
-                  placeholder="Alex Morgan"
-                  required
-                  maxLength={80}
-                />
-              </label>
-            )}
-            <label>
-              Email address
-              <input
-                type="email"
-                name="email"
-                autoComplete="email"
-                placeholder="you@example.com"
-                required
-              />
-            </label>
-            <label>
-              Password
-              <input
-                type="password"
-                name="password"
-                autoComplete={setup ? "new-password" : "current-password"}
-                placeholder={setup ? "At least 12 characters" : "Your password"}
-                required
-                minLength={12}
-                maxLength={128}
-              />
-            </label>
-            {error && (
-              <div className="form-error" role="alert">
-                {error}
-              </div>
-            )}
-            <button className="button primary full" disabled={busy}>
-              {busy ? (
-                <Loader2 size={18} className="spin" />
-              ) : (
-                <>
-                  {setup ? "Create your workspace" : "Sign in"}
-                  <ArrowRight size={18} />
-                </>
-              )}
-            </button>
-          </form>
-          {!setup && (
-            <button
-              className="text-button forgot-password"
-              onClick={() => setRecoveryHelp(true)}
-            >
-              Forgot your password?
-            </button>
-          )}
-          {recoveryHelp && (
-            <Modal
-              title="Let’s get you back in."
-              onClose={() => setRecoveryHelp(false)}
-            >
-              <div className="simple-form">
-                <p>
-                  Ask your OpenQR server operator for a password recovery link.
-                  The link works once and expires in 30 minutes. If you run this
-                  server, follow the account recovery instructions in the
-                  project README.
-                </p>
-                <button
-                  className="button primary full"
-                  onClick={() => setRecoveryHelp(false)}
-                >
-                  Got it
-                </button>
-              </div>
-            </Modal>
-          )}
-          <div className="auth-note">
-            <ShieldCheck size={17} />
-            <span>Self-hosted. No subscriptions. No scan limits.</span>
-          </div>
-        </div>
-        <span className="auth-bottom">
-          <Code2 size={15} /> Built in the open. Made for everyone.
-        </span>
-      </main>
-    </div>
+    </Landing>
   );
 }
 export default function App() {
+  useEffect(() => startMotion(), []);
   const [auth, setAuth] = useState<AuthState | null>(null);
   const [accessLink, setAccessLink] = useState<AccessLink | null>(
     readAccessLink,
@@ -960,7 +923,7 @@ export default function App() {
             <span className="signal-dot" /> INDEPENDENT BY DESIGN
           </span>
         </header>
-        <main className="main-content" key={page}>
+        <main className="main-content" key={page} ref={pageIn}>
           {page === "operator" && auth.operator ? (
             <React.Suspense
               fallback={
@@ -1059,21 +1022,25 @@ export default function App() {
                   )}
                 </div>
               )}
-              <section className="stats-grid">
-                <div className="stat-card">
+              <section className="stats-grid" data-stagger>
+                <div className="stat-card" data-spot>
                   <div>
                     <span>Total QR codes</span>
-                    <strong>{formatNumber(codes.length)}</strong>
+                    <strong data-count={codes.length}>
+                      {formatNumber(codes.length)}
+                    </strong>
                     <small>Across your workspace</small>
                   </div>
                   <span className="stat-icon green">
                     <QrCode size={21} />
                   </span>
                 </div>
-                <div className="stat-card">
+                <div className="stat-card" data-spot>
                   <div>
                     <span>Total scans</span>
-                    <strong>{formatNumber(totalScans)}</strong>
+                    <strong data-count={totalScans}>
+                      {formatNumber(totalScans)}
+                    </strong>
                     <small>
                       <span className="status-dot" /> All-time dynamic link
                       visits
@@ -1083,10 +1050,10 @@ export default function App() {
                     <MousePointer2 size={21} />
                   </span>
                 </div>
-                <div className="stat-card">
+                <div className="stat-card" data-spot>
                   <div>
                     <span>Active QR codes</span>
-                    <strong>{formatNumber(active)}</strong>
+                    <strong data-count={active}>{formatNumber(active)}</strong>
                     <small>Available to connect</small>
                   </div>
                   <span className="stat-icon lavender">

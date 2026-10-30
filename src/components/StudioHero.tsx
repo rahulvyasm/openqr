@@ -42,7 +42,7 @@ export default function StudioHero({
   return (
     <>
       <section className="studio-hero" aria-label="QR launch studio">
-        <div className="hero-editorial">
+        <div className="hero-editorial" data-stagger>
           <span className="studio-kicker">
             <span className="signal-dot" /> YOUR NEXT CONNECTION STARTS HERE
           </span>
@@ -60,6 +60,7 @@ export default function StudioHero({
           <div className="hero-actions">
             <button
               className="button primary"
+              data-magnetic
               title="New QR code (N)"
               disabled={!canEdit}
               onClick={() => onCreate({ type: "url" })}
@@ -75,7 +76,7 @@ export default function StudioHero({
             <span>01 — ∞</span>
           </div>
         </div>
-        <div className="qr-sketchpad">
+        <div className="qr-sketchpad" data-tilt>
           <div className="sketchpad-top">
             <span>
               <ScanLine size={15} /> THE QUICK STUDIO

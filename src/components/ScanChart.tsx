@@ -53,6 +53,7 @@ export default function ScanChart({
         </div>
         <div className="chart-body">
           <svg
+            data-wipe
             viewBox={`0 0 ${width} ${height}`}
             preserveAspectRatio="none"
             role="img"

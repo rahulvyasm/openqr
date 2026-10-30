@@ -16,9 +16,9 @@
   top: calc(100% - 22px);
   left: 0;
   width: 250px;
-  background: #fff;
+  background: #161616;
   z-index: 45;
-  border: 1px solid #dfe7d7;
+  border: 1px solid #262c2a;
   border-radius: 10px;
   box-shadow: 0 10px 30px #2445281c;
   padding: 9px;
@@ -37,7 +37,7 @@
   border-radius: 6px;
 }
 .workspace-menu > button:hover {
-  background: #f1f6e9;
+  background: #161d1b;
 }
 .workspace-menu > button > span {
   flex: 1;
@@ -60,7 +60,7 @@
   border-top: 1px solid var(--line);
   border-radius: 0;
   font-size: 10px;
-  color: #829d6c;
+  color: #75a38c;
   margin-top: 7px;
   padding-top: 15px;
 }
@@ -89,7 +89,7 @@
   border-bottom: 2px solid transparent;
 }
 .settings-tabs button.active {
-  color: #517748;
+  color: #94bea9;
   border-bottom-color: #72965a;
   font-weight: 600;
 }
@@ -97,7 +97,7 @@
   border: 1px solid var(--line);
   border-radius: 12px;
   padding: 25px;
-  background: #fff;
+  background: #161616;
   margin-bottom: 23px;
 }
 .settings-panel-heading {
@@ -108,7 +108,7 @@
   margin-bottom: 24px;
 }
 .settings-panel-heading h2 {
-  font-family: Manrope, sans-serif;
+  font-family: var(--font-display);
   font-size: 17px;
   letter-spacing: -0.5px;
   font-weight: 650;
@@ -131,8 +131,8 @@
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
-  background: #f8faf4;
-  border: 1px solid #e7eddf;
+  background: #131917;
+  border: 1px solid #262c2a;
   border-radius: 8px;
   padding: 16px;
   margin-bottom: 12px;
@@ -149,8 +149,8 @@
   gap: 4px;
   white-space: nowrap;
   text-transform: capitalize;
-  border: 1px solid #e4eada;
-  background: #f4f7ec;
+  border: 1px solid #262c2a;
+  background: #151c19;
   border-radius: 4px;
   padding: 4px 7px;
   font-size: 8px;
@@ -159,28 +159,28 @@
 .role-badge.owner {
   color: #9b8d54;
   background: #f8f4e8;
-  border-color: #ede5cc;
+  border-color: #262c2a;
 }
 .role-badge.admin {
   color: #7b8fad;
-  background: #eff2f8;
-  border-color: #e3e9f2;
+  background: #141b18;
+  border-color: #262c2a;
 }
 .role-badge.editor {
-  color: #8b9f70;
-  background: #f1f6e9;
+  color: #76a38c;
+  background: #161d1b;
 }
 .role-badge.viewer {
   color: #a29baa;
-  background: #f4f1f7;
-  border-color: #e9e3ee;
+  background: #151a18;
+  border-color: #262c2a;
 }
 .team-row {
   display: flex;
   align-items: center;
   gap: 12px;
   padding: 19px 2px;
-  border-bottom: 1px solid #edf1e6;
+  border-bottom: 1px solid #262c2a;
 }
 .team-row:last-child {
   border-bottom: 0;
@@ -193,8 +193,8 @@
   place-items: center;
   font-size: 12px;
   font-weight: 600;
-  background: #e9eedf;
-  color: #8c9f71;
+  background: #1b211f;
+  color: #76a28c;
   flex-shrink: 0;
 }
 .member-identity {
@@ -205,7 +205,7 @@
   display: block;
   font-size: 12px;
   font-weight: 500;
-  color: #6d8560;
+  color: #87a897;
   overflow-wrap: anywhere;
 }
 .member-identity > span {
@@ -219,14 +219,14 @@
   display: inline-block;
   font-size: 8px;
   color: #acb79f;
-  border: 1px solid #e6ecdd;
+  border: 1px solid #262c2a;
   padding: 1px 5px;
   border-radius: 4px;
   margin-left: 7px;
 }
 .team-row select {
   font-size: 10px;
-  border: 1px solid #e0e8d6;
+  border: 1px solid #262c2a;
   border-radius: 5px;
   padding: 7px 10px;
   color: #8ca474;
@@ -235,7 +235,7 @@
 .transfer-trigger {
   margin-top: 17px;
   font-size: 9px;
-  color: #a99a69;
+  color: #ab9d6d;
 }
 .invite-row {
   display: flex;
@@ -250,7 +250,7 @@
   width: 32px;
   height: 32px;
   border-radius: 9px;
-  background: #f0f5e7;
+  background: #161e1b;
   color: #a5b98c;
   flex-shrink: 0;
 }
@@ -262,7 +262,7 @@
   font-size: 11px;
   display: block;
   font-weight: 500;
-  color: #819a6b;
+  color: #77a28c;
   overflow-wrap: anywhere;
 }
 .invite-row small {
@@ -290,8 +290,8 @@
   place-items: center;
   width: 45px;
   height: 45px;
-  background: #eef5e5;
-  border: 1px solid #e1edcf;
+  background: #171f1c;
+  border: 1px solid #262c2a;
   border-radius: 50%;
   color: #8da972;
   margin: 2px auto 19px;
@@ -304,7 +304,7 @@
   min-width: 0;
   flex: 1;
   padding: 10px;
-  border: 1px solid #e0e8d6;
+  border: 1px solid #262c2a;
   border-radius: 6px;
   font-size: 10px;
   background: #fbfdf8;
@@ -325,9 +325,9 @@
   width: 43px;
   height: 43px;
   border-radius: 14px;
-  color: #9f8d69;
-  background: #f1ebdd;
-  border: 1px solid #e8e0cd;
+  color: #a59573;
+  background: #19221f;
+  border: 1px solid #262c2a;
   font-size: 15px;
   font-weight: 600;
 }
@@ -344,7 +344,7 @@
   width: 34px;
   height: 34px;
   border-radius: 9px;
-  background: #f0f5e8;
+  background: #161e1b;
   color: #a0b48a;
   flex-shrink: 0;
 }
@@ -355,7 +355,7 @@
 .session-row strong {
   font-size: 11px;
   font-weight: 500;
-  color: #869e72;
+  color: #77a18c;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -371,9 +371,9 @@
   font-size: 6px;
   letter-spacing: 0.5px;
   color: #9cb184;
-  border: 1px solid #dfebd1;
+  border: 1px solid #262c2a;
   border-radius: 3px;
-  background: #f5f9ee;
+  background: #141b19;
   padding: 3px 5px;
 }
 .session-footer {
@@ -402,7 +402,7 @@
   display: block;
   font-size: 11px;
   font-weight: 500;
-  color: #8ca078;
+  color: #78a08c;
 }
 .audit-row p {
   font-size: 9px;
@@ -426,14 +426,14 @@
 }
 .viewer-notice {
   font-size: 10px;
-  border: 1px solid #e5e8e0;
+  border: 1px solid #262c2a;
   border-radius: 6px;
   padding: 10px 13px;
   color: #a3ad97;
-  background: #f6f8f1;
+  background: #141a18;
 }
 .workspace-welcome h2 {
-  font-family: Manrope, sans-serif;
+  font-family: var(--font-display);
   font-size: 21px;
   letter-spacing: -0.7px;
 }
@@ -450,15 +450,15 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: radial-gradient(ellipse at top, #edf3e4, #fbfcf8 70%);
+  background: radial-gradient(ellipse at top, #181f1c, #111715 70%);
   padding: 40px 20px;
 }
 .access-brand {
   display: flex;
   align-items: center;
   gap: 8px;
-  color: #4b7150;
-  font-family: Manrope, sans-serif;
+  color: #9abcab;
+  font-family: var(--font-display);
   font-size: 25px;
   letter-spacing: -1.2px;
   font-weight: 700;
@@ -468,8 +468,8 @@
   width: 100%;
   max-width: 445px;
   padding: 33px;
-  background: white;
-  border: 1px solid #e3eadb;
+  background: #161616;
+  border: 1px solid #262c2a;
   border-radius: 14px;
   box-shadow: 0 10px 35px #23462606;
 }
@@ -479,13 +479,13 @@
   width: 45px;
   height: 45px;
   border-radius: 13px;
-  background: #edf5e3;
-  border: 1px solid #e2edcf;
+  background: #17201c;
+  border: 1px solid #262c2a;
   color: #96ae7b;
   margin-bottom: 23px;
 }
 .access-card h1 {
-  font-family: Manrope, sans-serif;
+  font-family: var(--font-display);
   font-size: 25px;
   font-weight: 650;
   letter-spacing: -1px;
@@ -526,11 +526,11 @@
   max-width: 540px;
 }
 .access-card input:read-only {
-  background: #f6f9f0;
+  background: #141b18;
   color: #a0b08e;
 }
 .settings-form input:read-only {
-  background: #f6f9f0;
+  background: #141b18;
   color: #9caf87;
 }
 @media (max-width: 1150px) {
