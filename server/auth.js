@@ -12,6 +12,7 @@ import {
 } from "./security.js";
 import { createWorkspace, workspaceList } from "./workspaces.js";
 import { isOperator, operatorRole } from "./operator.js";
+import { isSuspended } from "./support.js";
 
 const emailSchema = z
   .email()
@@ -91,7 +92,7 @@ export function registerAuth(
           "SELECT u.id,u.email,u.name,s.workspace_id FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token=? AND s.expires>?",
         )
         .get(digest(raw), Date.now());
-      if (s) {
+      if (s && !isSuspended(db, s.id)) {
         req.user = { id: s.id, email: s.email, name: s.name };
         req.sessionId = digest(raw);
         const ws = workspaceList(db, s.id);
@@ -165,6 +166,11 @@ export function registerAuth(
         ?.password !== user.password
     )
       throw problem("Please sign in again.", 401);
+    if (isSuspended(db, user.id))
+      throw problem(
+        "This account is suspended. Contact support to restore access.",
+        403,
+      );
     session(req, res, user.id);
     res.json({ id: user.id, name: user.name, email: user.email });
   });

@@ -6,6 +6,7 @@ import {
   Check,
   Database,
   Eye,
+  LifeBuoy,
   Loader2,
   LockKeyhole,
   Pause,
@@ -21,6 +22,11 @@ import { api, formatNumber } from "../lib";
 import Modal from "./Modal";
 import StaffPanel from "./StaffPanel";
 import OperatorBilling from "./OperatorBilling";
+import {
+  CustomerDialog,
+  OperatorAudit,
+  OperatorCases,
+} from "./OperatorSupport";
 import { staffRoles } from "../../shared/operator-access.js";
 
 type WorkspaceRow = {
@@ -122,6 +128,7 @@ export default function OperatorConsole({ userId }: { userId: string }) {
     [users, setUsers] = useState<Listing<UserRow> | null>(null),
     [tableError, setTableError] = useState(""),
     [revoke, setRevoke] = useState<UserRow | null>(null),
+    [customer, setCustomer] = useState<string | null>(null),
     [busy, setBusy] = useState(false),
     [actionError, setActionError] = useState(""),
     [message, setMessage] = useState("");
@@ -132,6 +139,8 @@ export default function OperatorConsole({ userId }: { userId: string }) {
     operations: "operations:read",
     staff: "staff:manage",
     billing: "billing:manage",
+    cases: "cases:manage",
+    audit: "audit:read",
   };
   const can = (permission: string) =>
     !!snapshot?.access.permissions.includes(permission);
@@ -293,7 +302,9 @@ export default function OperatorConsole({ userId }: { userId: string }) {
           { id: "activity", label: "Activity", icon: Eye },
           { id: "operations", label: "Operations", icon: Server },
           { id: "staff", label: "Company staff", icon: Users },
+          { id: "cases", label: "Cases", icon: LifeBuoy },
           { id: "billing", label: "Billing", icon: Database },
+          { id: "audit", label: "Staff audit", icon: Eye },
           { id: "access", label: "Access model", icon: ShieldCheck },
         ]
           .filter(
@@ -527,6 +538,7 @@ export default function OperatorConsole({ userId }: { userId: string }) {
                               "Codes",
                               "Visits",
                               "Media",
+                              "Manage",
                             ]
                         ).map((label) => (
                           <th key={label}>{label}</th>
@@ -584,6 +596,14 @@ export default function OperatorConsole({ userId }: { userId: string }) {
                               <td>{workspace.codes}</td>
                               <td>{formatNumber(workspace.scans)}</td>
                               <td>{size(workspace.mediaBytes)}</td>
+                              <td>
+                                <button
+                                  className="button secondary small"
+                                  onClick={() => setCustomer(workspace.id)}
+                                >
+                                  Open account
+                                </button>
+                              </td>
                             </tr>
                           ))}
                     </tbody>
@@ -754,6 +774,8 @@ export default function OperatorConsole({ userId }: { userId: string }) {
                 </section>
               </div>
             )}
+            {view === "cases" && <OperatorCases onOpenCustomer={setCustomer} />}
+            {view === "audit" && <OperatorAudit />}
             {view === "billing" && (
               <OperatorBilling onChange={() => setRevision((v) => v + 1)} />
             )}
@@ -832,6 +854,18 @@ export default function OperatorConsole({ userId }: { userId: string }) {
             )}
           </>
         )
+      )}
+      {customer && (
+        <CustomerDialog
+          id={customer}
+          userId={userId}
+          onClose={() => setCustomer(null)}
+          onChange={() => setRevision((v) => v + 1)}
+          onManageBilling={() => {
+            setCustomer(null);
+            changeTab("billing");
+          }}
+        />
       )}
       {revoke && (
         <Modal

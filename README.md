@@ -87,6 +87,22 @@ It does not measure current online users, physical free disk space, or arbitrary
 HTTP requests. Session counts are unexpired sign-ins. Operator grants and audit
 records are stored in the database and travel with backups.
 
+#### Customer support and privacy
+
+Open any workspace from **Control room → Workspaces → Open account** to see its
+plan, usage, members, and recent cases. Staff can open support cases (billing,
+subscription, account, technical) with internal notes, status, priority, and
+assignment; fix plan access through Billing; and suspend or restore a customer
+account (password-confirmed, with a recorded reason; sessions end and sign-in is
+blocked, while content and printed links are untouched). Company staff accounts
+cannot be suspended here.
+
+Privacy boundaries: staff see masked email addresses by default and must give a
+reason to reveal one. QR content, visitor records, uploaded media, and passwords
+are never exposed through the control room. Customer views, reveals, case
+changes, and account actions are written to a **Staff audit** log that only a
+Super Admin can read.
+
 Company departments have separate server-enforced permissions:
 
 | Staff role | Internal access |

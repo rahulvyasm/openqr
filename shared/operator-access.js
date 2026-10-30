@@ -8,6 +8,9 @@ const all = [
   "sessions:revoke",
   "staff:manage",
   "billing:manage",
+  "cases:manage",
+  "accounts:manage",
+  "audit:read",
 ];
 export const staffRoles = [
   {
@@ -37,21 +40,29 @@ export const staffRoles = [
     label: "Support",
     department: "Customer support",
     description:
-      "Find customer accounts and workspaces, review activity, and revoke sessions with password confirmation.",
+      "Find customer accounts, work support cases, reveal contact details with a recorded reason, suspend or restore accounts, and revoke sessions.",
     permissions: [
       "overview:read",
       "workspaces:read",
       "users:read",
       "activity:read",
       "sessions:revoke",
+      "cases:manage",
+      "accounts:manage",
     ],
   },
   {
     id: "billing",
     label: "Billing",
     department: "Finance",
-    description: "Review workspace usage and manage hosted plan entitlements.",
-    permissions: ["overview:read", "workspaces:read", "billing:manage"],
+    description:
+      "Review workspace usage, manage hosted plan entitlements, and resolve billing and subscription cases.",
+    permissions: [
+      "overview:read",
+      "workspaces:read",
+      "billing:manage",
+      "cases:manage",
+    ],
   },
   {
     id: "analyst",

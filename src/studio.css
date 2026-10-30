@@ -2843,3 +2843,35 @@ kbd {
     font-size: 7px;
   }
 }
+
+.case-detail h3 {
+  margin: 1.2rem 0 0.4rem;
+  font-size: 1rem;
+}
+.case-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem;
+  margin: 0.75rem 0;
+}
+.case-actions label {
+  display: grid;
+  gap: 0.25rem;
+  font-size: 0.85rem;
+}
+.case-list {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: grid;
+  gap: 0.3rem;
+}
+.link-button {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+  font: inherit;
+}

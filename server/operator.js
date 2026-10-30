@@ -5,6 +5,7 @@ import { rateLimit } from "express-rate-limit";
 import { atomic, passwordMatches, problem } from "./security.js";
 import { createBackup } from "./backup.js";
 import { readBackupStatus } from "./backup-status.js";
+import { maskEmail } from "./support.js";
 import { staffRoles, staffPermissions } from "../shared/operator-access.js";
 
 export function operatorRole(db, userId) {
@@ -275,7 +276,11 @@ export function registerOperatorRoutes(
         `SELECT u.id,u.name,u.email,(SELECT COUNT(*) FROM members m WHERE m.user_id=u.id) AS workspaces,(SELECT COUNT(*) FROM sessions s WHERE s.user_id=u.id AND s.expires>?) AS sessions FROM users u WHERE u.name LIKE ? OR u.email LIKE ? ORDER BY u.rowid DESC LIMIT 25 OFFSET ?`,
       )
       .all(Date.now(), search, search, page * 25)
-      .map((user) => ({ ...user, operator: isOperator(db, user.id) }));
+      .map((user) => ({
+        ...user,
+        email: maskEmail(user.email),
+        operator: isOperator(db, user.id),
+      }));
     res.json({
       rows,
       total: count(

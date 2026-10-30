@@ -13,6 +13,7 @@ import { registerAuth } from "./auth.js";
 import { access, problem, canManage } from "./security.js";
 import { readBackupStatus } from "./backup-status.js";
 import { registerOperatorRoutes } from "./operator.js";
+import { registerSupportRoutes } from "./support.js";
 import {
   createEntitlements,
   registerPlanRoutes,
@@ -145,6 +146,7 @@ export function createApp({
     backupPolicy,
   });
   registerPlanAdminRoutes(app, db, entitlements);
+  registerSupportRoutes(app, db, entitlements);
   registerWorkspaceRoutes(app, db, origin, entitlements);
   app.use("/api", (req, _res, next) => {
     if (!req.workspace)
