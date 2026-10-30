@@ -4,6 +4,8 @@ import { z } from "zod";
 import { audit, problem } from "./security.js";
 import {
   assertBlockAssets,
+  isVisible,
+  validZone,
   blockSchema,
   experienceSchema,
   formAnswers,
@@ -121,6 +123,20 @@ export function registerExperienceRoutes(
     );
     res.json({ ok: true, emails: emails(data) });
   });
+  app.get("/api/codes/:id/experience/settings", (req, res) =>
+    res.json({ timeZone: JSON.parse(owned(req).data).timeZone || "UTC" }),
+  );
+  app.put("/api/codes/:id/experience/settings", (req, res) => {
+    const row = owned(req),
+      zone = z.string().max(60).safeParse(req.body?.timeZone);
+    if (!zone.success || !validZone(zone.data))
+      throw problem("Choose a valid time zone.");
+    db.prepare("UPDATE codes SET data=? WHERE id=?").run(
+      JSON.stringify({ ...JSON.parse(row.data), timeZone: zone.data }),
+      row.id,
+    );
+    res.json({ ok: true, timeZone: zone.data });
+  });
   app.get("/api/experience/templates", (_req, res) => res.json(templates()));
   app.post("/api/experience/preview", (req, res) => {
     const input = z
@@ -128,6 +144,8 @@ export function registerExperienceRoutes(
         title: z.string().trim().max(100).default("Preview"),
         blocks: z.array(z.any()).max(30),
         pageOptions: z.record(z.string(), z.any()).default({}),
+        at: z.iso.datetime({ offset: true }).optional(),
+        timeZone: z.string().max(60).default("UTC"),
       })
       .parse(req.body);
     // Half-edited blocks are skipped so the preview keeps working while typing.
@@ -144,7 +162,12 @@ export function registerExperienceRoutes(
           pageOptions: input.pageOptions,
           ticket: "preview",
         },
-        { mediaUrl: mediaFor, preview: true },
+        {
+          mediaUrl: mediaFor,
+          preview: true,
+          now: input.at ? new Date(input.at) : new Date(),
+          zone: input.timeZone,
+        },
       ),
     );
   });
@@ -440,7 +463,8 @@ export function registerExperienceRoutes(
         data = JSON.parse(row.data),
         blocks = parseBlocks(data),
         block = blocks.find((b) => b.id === req.params.block && b.type === "form");
-      if (!block) throw problem("This form is not available.", 404);
+      if (!block || !isVisible(block, new Date(), data.timeZone))
+        throw problem("This form is not available.", 404);
       const ticket = publicTicket(row.id, analyticsSalt, 25);
       const page = (extra) =>
         res.type("html").send(
@@ -455,6 +479,7 @@ export function registerExperienceRoutes(
             {
               mediaUrl: (id) =>
                 `/r/${encodeURIComponent(row.slug)}/media/${encodeURIComponent(id)}?ticket=${encodeURIComponent(ticket)}`,
+              zone: data.timeZone || "UTC",
               ...extra,
             },
           ),

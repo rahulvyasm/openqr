@@ -16,6 +16,17 @@ const action = z
   .max(2000)
   .refine((value) => safeAction(value), "Use an http(s), tel: or mailto: link.");
 const assetId = z.string().uuid();
+const time = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
+// A rule decides when a block is shown, in the page's time zone.
+export const whenSchema = z
+  .object({
+    days: z.array(z.number().int().min(0).max(6)).max(7).default([]),
+    from: time.optional(),
+    to: time.optional(),
+  })
+  .refine((w) => (w.from === undefined) === (w.to === undefined), "Set both times.")
+  .refine((w) => w.days.length || w.from !== undefined, "Choose days or times.");
+const base = { id, when: whenSchema.optional() };
 
 export function safeAction(value) {
   try {
@@ -41,33 +52,33 @@ const field = z.object({
 });
 export const blockSchema = z.discriminatedUnion("type", [
   z.object({
-    id,
+    ...base,
     type: z.literal("heading"),
     text: text(120).min(1),
     subtext: text(300).default(""),
   }),
-  z.object({ id, type: z.literal("text"), text: text(2500).min(1) }),
+  z.object({ ...base, type: z.literal("text"), text: text(2500).min(1) }),
   z.object({
-    id,
+    ...base,
     type: z.literal("image"),
     assetId,
     alt: text(200).default(""),
     caption: text(200).default(""),
   }),
   z.object({
-    id,
+    ...base,
     type: z.literal("video"),
     assetId,
     caption: text(200).default(""),
   }),
   z.object({
-    id,
+    ...base,
     type: z.literal("button"),
     label: text(60).min(1),
     url: action,
   }),
   z.object({
-    id,
+    ...base,
     type: z.literal("links"),
     items: z
       .array(z.object({ label: text(60).min(1), url: action }))
@@ -75,13 +86,13 @@ export const blockSchema = z.discriminatedUnion("type", [
       .max(10),
   }),
   z.object({
-    id,
+    ...base,
     type: z.literal("file"),
     assetId,
     label: text(80).min(1),
   }),
   z.object({
-    id,
+    ...base,
     type: z.literal("form"),
     title: text(100).min(1),
     intro: text(300).default(""),
@@ -166,6 +177,35 @@ export function assertBlockAssets(db, blocks, workspaceId) {
   }
 }
 
+export function validZone(zone) {
+  try {
+    new Intl.DateTimeFormat("en", { timeZone: zone }).format();
+    return true;
+  } catch {
+    return false;
+  }
+}
+export function isVisible(block, now = new Date(), zone = "UTC") {
+  const w = block.when;
+  if (!w) return true;
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-US", {
+      timeZone: validZone(zone) ? zone : "UTC",
+      weekday: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+    })
+      .formatToParts(now)
+      .map((p) => [p.type, p.value]),
+  );
+  const day = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(parts.weekday);
+  if (w.days?.length && !w.days.includes(day)) return false;
+  if (w.from === undefined) return true;
+  const at = `${parts.hour}:${parts.minute}`;
+  return w.from <= w.to ? at >= w.from && at < w.to : at >= w.from || at < w.to;
+}
+
 export function formAnswers(block, input) {
   const answers = {};
   for (const f of block.fields) {
@@ -200,7 +240,15 @@ const css = (p) => {
 
 export function renderExperience(
   { title, blocks, slug, pageOptions = {}, ticket },
-  { mediaUrl, sent = null, error = null, values = {}, preview = false } = {},
+  {
+    mediaUrl,
+    sent = null,
+    error = null,
+    values = {},
+    preview = false,
+    now = new Date(),
+    zone = "UTC",
+  } = {},
 ) {
   const go = (blockId, index = 0) =>
     preview
@@ -248,7 +296,10 @@ export function renderExperience(
     }
     return "";
   };
-  const body = blocks.map(renderBlock).join("");
+  const body = blocks
+    .filter((block) => isVisible(block, now, zone))
+    .map(renderBlock)
+    .join("");
   return `<!doctype html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><meta name="referrer" content="no-referrer"><title>${xml(title)} · OpenQR</title><style>${css(pageOptions)}</style></head><body><main>${body}${pageOptions.showBrand === false ? "" : '<div class="xp-foot">Made with OpenQR</div>'}</main></body></html>`;
 }
 

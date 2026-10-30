@@ -220,3 +220,101 @@ test("form alerts email the owner without answers and are throttled", async (t) 
   assert.deepEqual(sent[0][0], ["owner@example.com"]);
   assert.doesNotMatch(JSON.stringify(sent[0]), /a1@example\.com/);
 });
+
+test("blocks follow time rules in the page's time zone", async (t) => {
+  const { request, setup, base } = await fixture(t);
+  await setup();
+  const rule = (id, text, when) => ({ id, type: "text", text, when });
+  const list = [
+    rule("morn1", "Breakfast menu", { days: [], from: "06:00", to: "11:00" }),
+    rule("late1", "Late night", { days: [], from: "22:00", to: "02:00" }),
+    rule("wkend", "Weekend brunch", { days: [0, 6] }),
+    { id: "alway", type: "text", text: "Always here" },
+  ];
+  const code = await (
+    await create(request, { data: { title: "Café", blocks: JSON.stringify(list) } })
+  ).json();
+  assert.equal(
+    (await bad([{ id: "bad01", type: "text", text: "x", when: { days: [] } }])).status,
+    400,
+  );
+  assert.equal(
+    (await request(`/api/codes/${code.id}/experience/settings`, { method: "PUT", body: { timeZone: "Nowhere/Land" } })).status,
+    400,
+  );
+  await request(`/api/codes/${code.id}/experience/settings`, {
+    method: "PUT",
+    body: { timeZone: "Asia/Kolkata" },
+  });
+  const preview = async (at) =>
+    (
+      await request("/api/experience/preview", {
+        method: "POST",
+        body: { title: "Café", blocks: list, at, timeZone: "Asia/Kolkata" },
+      })
+    ).text();
+  // 2026-03-07 is a Saturday. 08:00 IST = 02:30 UTC.
+  let html = await preview("2026-03-07T02:30:00Z");
+  assert.match(html, /Breakfast menu/);
+  assert.match(html, /Weekend brunch/);
+  assert.doesNotMatch(html, /Late night/);
+  // Monday 23:30 IST: only the overnight rule and the always block.
+  html = await preview("2026-03-09T18:00:00Z");
+  assert.match(html, /Late night/);
+  assert.match(html, /Always here/);
+  assert.doesNotMatch(html, /Breakfast menu|Weekend brunch/);
+  // 01:00 IST Tuesday is inside the overnight range too.
+  assert.match(await preview("2026-03-09T19:30:00Z"), /Late night/);
+  function bad(blocks) {
+    return create(request, { data: { title: "x", blocks: JSON.stringify(blocks) } });
+  }
+});
+
+test("files used by drafts and older versions cannot be deleted", async (t) => {
+  const { request, setup, db } = await fixture(t);
+  await setup();
+  const code = await (await create(request)).json();
+  const workspace = db.prepare("SELECT id FROM workspaces").get().id,
+    user = db.prepare("SELECT id FROM users").get().id,
+    asset = "6f1d3c9a-2b1e-4d7a-9c3e-0a1b2c3d4e5f";
+  db.prepare(
+    "INSERT INTO assets (id,workspace_id,user_id,name,kind,mime,size,storage_key,sha256,created_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
+  ).run(asset, workspace, user, "pic.png", "image", "image/png", 10, "k.png", "x", new Date().toISOString());
+  await request(`/api/codes/${code.id}/experience/draft`, {
+    method: "PUT",
+    body: { title: "Café", blocks: [{ id: "img01", type: "image", assetId: asset }] },
+  });
+  const res = await request(`/api/assets/${asset}`, { method: "DELETE" });
+  assert.equal(res.status, 409);
+  assert.match((await res.json()).error, /draft or earlier version/);
+  await request(`/api/codes/${code.id}/experience/draft`, { method: "DELETE" });
+  db.prepare(
+    "INSERT INTO experience_versions (code_id,version,title,blocks,created_at) VALUES (?,?,?,?,?)",
+  ).run(code.id, 1, "Old", JSON.stringify([{ id: "img01", type: "image", assetId: asset }]), new Date().toISOString());
+  assert.equal((await request(`/api/assets/${asset}`, { method: "DELETE" })).status, 409);
+});
+
+test("the public page renders every block type without scripts and escapes content", async () => {
+  const { renderExperience, templates } = await import("../server/experience-blocks.js");
+  const asset = "6f1d3c9a-2b1e-4d7a-9c3e-0a1b2c3d4e5f";
+  const blocks = [
+    { id: "aaaa1", type: "heading", text: "<b>Hi</b>", subtext: "Sub" },
+    { id: "aaaa2", type: "text", text: "Body" },
+    { id: "aaaa3", type: "image", assetId: asset, alt: "Alt", caption: "Cap" },
+    { id: "aaaa4", type: "video", assetId: asset, caption: "" },
+    { id: "aaaa5", type: "button", label: "Go", url: "https://example.com" },
+    { id: "aaaa6", type: "links", items: [{ label: "One", url: "https://example.com" }] },
+    { id: "aaaa7", type: "file", assetId: asset, label: "Manual" },
+    ...templates()[0].blocks.filter((b) => b.type === "form").slice(0, 1),
+  ];
+  const html = renderExperience(
+    { title: "T", blocks, slug: "s", pageOptions: { theme: "bold", accent: "#285b48" }, ticket: "t" },
+    { mediaUrl: (id) => `/m/${id}` },
+  );
+  assert.doesNotMatch(html, /<script|javascript:|onclick=/i);
+  assert.match(html, /&lt;b&gt;Hi&lt;\/b&gt;/);
+  for (const marker of ["xp-card", "xp-image", "xp-video", "xp-btn", "xp-stack", "<form", 'name="website"', "xp-foot"])
+    assert.ok(html.includes(marker), marker);
+  assert.match(html, /name="viewport"/);
+  assert.match(html, /@media|max-width:480px/);
+});

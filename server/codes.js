@@ -395,6 +395,7 @@ export function registerCodeRoutes(
             title: live.title,
             blocks: live.blocks,
             alertEmails: live.alertEmails || "",
+            timeZone: live.timeZone || "UTC",
           };
         }
         validateAssetReferences(db, c.data, req.workspace.id, c.type);
@@ -647,7 +648,7 @@ export function registerCodeRoutes(
             pageOptions: c.pageOptions,
             ticket,
           },
-          { mediaUrl },
+          { mediaUrl, zone: c.data.timeZone || "UTC" },
         ),
       );
     }

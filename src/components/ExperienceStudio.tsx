@@ -12,6 +12,7 @@ import {
   Image as ImageIcon,
   Inbox,
   Link2,
+  Clock,
   Loader2,
   MousePointerClick,
   Plus,
@@ -76,6 +77,23 @@ export type Starter = {
   blocks: Block[];
 };
 
+// Reads a wall-clock time as being in the page's zone and returns the instant.
+function zonedIso(local: string, zone: string) {
+  try {
+    const guess = new Date(local + "Z");
+    const shown = new Date(guess.toLocaleString("en-US", { timeZone: zone }));
+    const asUtc = new Date(guess.toLocaleString("en-US", { timeZone: "UTC" }));
+    return new Date(
+      guess.getTime() - (shown.getTime() - asUtc.getTime()),
+    ).toISOString();
+  } catch {
+    return undefined;
+  }
+}
+const zoneNames: string[] =
+  (
+    Intl as unknown as { supportedValuesOf?: (k: string) => string[] }
+  ).supportedValuesOf?.("timeZone") ?? ["UTC"];
 const uid = () => "b" + Math.random().toString(36).slice(2, 8);
 const palette = [
   ["heading", "Heading", Heading],
@@ -146,10 +164,14 @@ export function PhoneFrame({
   title,
   blocks,
   options,
+  at,
+  timeZone,
 }: {
   title: string;
   blocks: Block[];
   options: Partial<PageOptions>;
+  at?: string;
+  timeZone?: string;
 }) {
   const [html, setHtml] = useState("");
   useEffect(() => {
@@ -160,7 +182,13 @@ export function PhoneFrame({
           method: "POST",
           credentials: "same-origin",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ title, blocks, pageOptions: options }),
+          body: JSON.stringify({
+            title,
+            blocks,
+            pageOptions: options,
+            ...(at ? { at } : {}),
+            ...(timeZone ? { timeZone } : {}),
+          }),
           signal: controller.signal,
         });
         if (res.ok) setHtml(await res.text());
@@ -172,7 +200,7 @@ export function PhoneFrame({
       clearTimeout(timer);
       controller.abort();
     };
-  }, [title, blocks, options]);
+  }, [title, blocks, options, at, timeZone]);
   return (
     <div className="xs-phone" aria-label="Phone preview">
       <i className="xs-notch" />
@@ -256,6 +284,109 @@ function Pick({
         />
       )}
     </>
+  );
+}
+
+type When = { days: number[]; from?: string; to?: string };
+const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+function RuleEditor({
+  when,
+  disabled,
+  onChange,
+}: {
+  when?: When;
+  disabled: boolean;
+  onChange: (when: When | undefined) => void;
+}) {
+  if (!when)
+    return (
+      <button
+        type="button"
+        className="button secondary small xs-rule-add"
+        disabled={disabled}
+        onClick={() => onChange({ days: [], from: "09:00", to: "17:00" })}
+      >
+        <Clock size={14} /> Show only at certain times
+      </button>
+    );
+  const timed = when.from !== undefined;
+  const set = (patch: Partial<When>) => {
+    const next = { ...when, ...patch };
+    if (!next.days.length && next.from === undefined)
+      next.days = [0, 1, 2, 3, 4, 5, 6];
+    onChange(next);
+  };
+  return (
+    <div className="xs-rule">
+      <strong>
+        <Clock size={13} /> Shown only…
+      </strong>
+      <div className="xs-days" role="group" aria-label="Days">
+        {dayNames.map((d, i) => (
+          <label key={d} className={when.days.includes(i) ? "on" : ""}>
+            <input
+              type="checkbox"
+              checked={when.days.includes(i)}
+              disabled={disabled}
+              onChange={() =>
+                set({
+                  days: when.days.includes(i)
+                    ? when.days.filter((x) => x !== i)
+                    : [...when.days, i].sort(),
+                })
+              }
+            />
+            {d}
+          </label>
+        ))}
+      </div>
+      <label className="xs-req">
+        <input
+          type="checkbox"
+          checked={timed}
+          disabled={disabled}
+          onChange={(e) =>
+            set(
+              e.target.checked
+                ? { from: "09:00", to: "17:00" }
+                : { from: undefined, to: undefined },
+            )
+          }
+        />
+        Between
+      </label>
+      {timed && (
+        <div className="xs-pair xs-times">
+          <input
+            type="time"
+            aria-label="From"
+            value={when.from}
+            disabled={disabled}
+            onChange={(e) => set({ from: e.target.value })}
+          />
+          <input
+            type="time"
+            aria-label="Until"
+            value={when.to}
+            disabled={disabled}
+            onChange={(e) => set({ to: e.target.value })}
+          />
+        </div>
+      )}
+      <small className="hint">
+        {when.days.length ? "On the chosen days" : "Every day"}
+        {timed ? `, ${when.from}–${when.to}` : ""}. A range like 22:00–02:00 runs
+        overnight.
+      </small>
+      <button
+        type="button"
+        className="button secondary small"
+        disabled={disabled}
+        onClick={() => onChange(undefined)}
+      >
+        Always show
+      </button>
+    </div>
   );
 }
 
@@ -524,6 +655,8 @@ export default function ExperienceStudio({
     emails: string;
   } | null>(null);
   const [alertNote, setAlertNote] = useState("");
+  const [zone, setZone] = useState("UTC");
+  const [previewAt, setPreviewAt] = useState("");
   const edited = useRef(false);
   const pending = useRef<ReturnType<typeof setTimeout> | null>(null);
   const path = `/codes/${code.id}/experience`;
@@ -533,6 +666,9 @@ export default function ExperienceStudio({
       .then(setDraft)
       .catch((e) => setError((e as Error).message));
     api<Asset[]>("/assets").then(setAssets).catch(() => {});
+    api<{ timeZone: string }>(`${path}/settings`)
+      .then((s) => setZone(s.timeZone))
+      .catch(() => {});
   }, [path]);
 
   useEffect(() => {
@@ -624,6 +760,15 @@ export default function ExperienceStudio({
       setError((e as Error).message);
     }
   }
+  async function saveZone(value: string) {
+    setZone(value);
+    try {
+      await api(`${path}/settings`, { timeZone: value }, "PUT");
+      setError("");
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
   async function saveAlerts() {
     if (!alerts) return;
     setAlertNote("");
@@ -698,6 +843,44 @@ export default function ExperienceStudio({
                   onChange={(e) => change({ title: e.target.value })}
                 />
               </label>
+              <div className="xs-time">
+                <label>
+                  Page time zone
+                  <input
+                    list="xs-zones"
+                    value={zone}
+                    disabled={!editable}
+                    onChange={(e) => {
+                      setZone(e.target.value);
+                      // A full zone name saves at once, so picking from the list is enough.
+                      if (editable && zoneNames.includes(e.target.value))
+                        saveZone(e.target.value);
+                    }}
+                    onBlur={(e) => editable && saveZone(e.target.value)}
+                  />
+                  <datalist id="xs-zones">
+                    {zoneNames.map((z) => (
+                      <option key={z} value={z} />
+                    ))}
+                  </datalist>
+                </label>
+                <label>
+                  Preview as
+                  <input
+                    type="datetime-local"
+                    value={previewAt}
+                    onChange={(e) => setPreviewAt(e.target.value)}
+                  />
+                </label>
+                <button
+                  type="button"
+                  className="button secondary small"
+                  disabled={!previewAt}
+                  onClick={() => setPreviewAt("")}
+                >
+                  Now
+                </button>
+              </div>
               <ol className="xs-blocks">
                 {draft.blocks.map((b, i) => (
                   <li key={b.id} className={open === b.id ? "open" : ""}>
@@ -709,7 +892,10 @@ export default function ExperienceStudio({
                         onClick={() => setOpen(open === b.id ? null : b.id)}
                       >
                         <span>{blockName[b.type] || b.type}</span>
-                        <em>{summary(b)}</em>
+                        <em>
+                          {b.when ? "⏱ " : ""}
+                          {summary(b)}
+                        </em>
                       </button>
                       {editable && (
                         <span className="xs-tools">
@@ -757,6 +943,11 @@ export default function ExperienceStudio({
                             )
                           }
                         />
+                        <RuleEditor
+                          when={b.when as When | undefined}
+                          disabled={!editable}
+                          onChange={(when) => patchBlock(b.id, { when })}
+                        />
                       </div>
                     )}
                   </li>
@@ -786,6 +977,8 @@ export default function ExperienceStudio({
                 title={draft.title}
                 blocks={draft.blocks}
                 options={code.pageOptions}
+                timeZone={zone}
+                at={previewAt ? zonedIso(previewAt, zone) : undefined}
               />
               <p className="hint">
                 Visitors keep seeing the published version until you publish.

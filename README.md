@@ -206,7 +206,8 @@ An **Experience** is a hosted page you build from blocks: heading, text, image, 
 - **Alerts:** with `SMTP_URL` set, owners can list up to three addresses in the Responses tab. The email only says a response arrived (never the answers) and is sent at most once every ten minutes per page.
 - **Results:** buttons and links go through a tracked redirect, so Studio shows scans next to taps and submissions. Only http(s), `tel:` and `mailto:` destinations are accepted.
 - **Privacy:** staff in the control room cannot read form responses; they are workspace data.
-- Images, videos and files must come from the workspace media library. A file used only by a draft or an older version is not protected from deletion; publishing re-checks every file.
+- **Time rules (adaptive pages):** any block can be shown only on chosen days and/or between two times in the page's time zone (overnight ranges such as 22:00–02:00 work). Use *Preview as* in Studio to see the page at any moment. Rules are checked on every visit; a hidden form cannot be submitted.
+- Images, videos and files must come from the workspace media library. A file used by a published page, a draft or any kept version cannot be deleted until it is replaced everywhere.
 
 The PDF reader uses locally bundled [Mozilla PDF.js](https://mozilla.github.io/pdf.js/) resources (Apache-2.0). It renders pages with bounded canvases, provides accessible extracted text, and does not enable embedded document scripts, interactive forms, or annotations. Scanned documents need the original download for OCR or other editing tools. There is no external viewer or CDN dependency.
 

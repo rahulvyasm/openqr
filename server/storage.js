@@ -466,10 +466,16 @@ export function registerAssetRoutes(app, db, storage, entitlements) {
         db
           .prepare("SELECT data FROM page_templates WHERE workspace_id=?")
           .all(req.workspace.id)
-          .some((t) => referencedAssets(JSON.parse(t.data)).includes(row.id))
+          .some((t) => referencedAssets(JSON.parse(t.data)).includes(row.id)) ||
+        db
+          .prepare(
+            "SELECT blocks FROM experience_drafts d JOIN codes c ON c.id=d.code_id WHERE c.workspace_id=? UNION ALL SELECT blocks FROM experience_versions v JOIN codes c ON c.id=v.code_id WHERE c.workspace_id=?",
+          )
+          .all(req.workspace.id, req.workspace.id)
+          .some((b) => blockAssetsOfData({ blocks: b.blocks }).includes(row.id))
       )
         throw problem(
-          "This file is used by a QR page or page template. Replace it there before removing it.",
+          "This file is used by a QR page, page template, draft or earlier version. Replace it there before removing it.",
           409,
         );
       db.prepare("DELETE FROM assets WHERE id=? AND workspace_id=?").run(
