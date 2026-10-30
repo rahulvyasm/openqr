@@ -64,6 +64,65 @@ v0.4 adds workspace media metadata and page themes. Files live in DATA_DIR/media
 
 ## Teams and workspaces
 
+### Company operator console
+
+Company staff access is separate from customer workspace Owner/Admin/Editor/Viewer
+roles. It is disabled by default: signup and workspace invitations never grant it.
+The server administrator can bootstrap a company Super Admin on an existing account:
+
+```sh
+npm run operator -- grant --email owner@example.com
+npm run operator -- grant --email support@example.com --role support
+npm run operator -- revoke --email owner@example.com
+npm run operator -- list
+```
+
+Use the running installation's `DATA_DIR`. Refresh the app after a grant to see
+**Control room**. The console includes installation totals, hourly dynamic-link
+visits, recent workspace and operator activity, searchable paginated workspace and
+account directories, storage/backup status, manual backups, and password-confirmed
+account session revocation. Data refreshes every five seconds and can be paused.
+It does not measure current online users, physical free disk space, or arbitrary
+HTTP requests. Session counts are unexpired sign-ins. Operator grants and audit
+records are stored in the database and travel with backups.
+
+Company departments have separate server-enforced permissions:
+
+| Staff role | Internal access |
+| --- | --- |
+| Super Admin | All console functions, staff assignment, and hosted-plan management |
+| Operations | Aggregate metrics, workspaces, activity, runtime, and backups |
+| Support | Customer/workspace directories, activity, and password-confirmed session revocation |
+| Billing | Aggregate metrics, workspace directory, and hosted-plan management |
+| Analyst | Aggregate analytics only; no customer directories or management actions |
+
+Super Admins can assign or remove staff in **Control room → Company staff**, with
+password confirmation. The UI prevents removal of the last Super Admin. The server
+CLI remains a trusted bootstrap/recovery boundary and can explicitly revoke grants.
+Revocation and department changes apply to existing sessions on the next request.
+
+Workspace roles share the studio interface with permission-aware controls. Viewers
+can read and download; Editors can manage content; Admins can also manage Editors
+and Viewers; Owners can manage Admins and transfer ownership. None of these roles
+implicitly grants platform access. QR creation, updates, duplication, pause/resume,
+move, deletion, and CSV imports now write workspace Activity events atomically.
+Earlier QR actions are not retroactively reconstructed.
+
+### Social QR destinations
+
+A Social media QR opens a hosted page listing your channels. That QR needs a
+reachable OpenQR server. A `localhost` address cannot reach your computer from a
+phone; the editor and download dialog show a warning for loopback destinations.
+Use a permanent HTTPS `PUBLIC_URL` for printed dynamic codes. For a single profile
+without a server dependency, use **Use a direct profile QR instead** in a new
+social editor, or create a static Website code. Static destinations cannot be
+edited after printing and do not produce scan analytics.
+
+Social buttons use shared SVG icons in the editor and published page. Named social
+platforms require HTTPS and a matching platform domain; duplicate social destinations
+are rejected. Pages support up to 12 labeled links. These constraints run on both
+the client and server.
+
 Use the workspace menu to create or switch workspaces. Codes, folders, saved designs, and analytics belong to a workspace; removing a member preserves their contributions and printed links.
 
 | Role   | Codes and designs    | Analytics and exports | Team administration                              |

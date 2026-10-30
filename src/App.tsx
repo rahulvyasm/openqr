@@ -71,6 +71,7 @@ import StudioHero, { type StudioDraft } from "./components/StudioHero";
 import CommandMenu from "./components/CommandMenu";
 import CampaignPulse from "./components/CampaignPulse";
 import ProfileMenu from "./components/ProfileMenu";
+import OperatorConsole from "./components/OperatorConsole";
 import ScanChart from "./components/ScanChart";
 import "./studio.css";
 import { typeIcons as icons } from "./components/codeTypes";
@@ -143,7 +144,7 @@ function Auth({ setup, onSuccess }: { setup: boolean; onSuccess: () => void }) {
             <span className="art-badge">
               <Leaf size={16} /> Yours to build on
             </span>
-            <span className="art-spark">âœ³</span>
+            <span className="art-spark">✳</span>
           </div>
         </div>
         <span className="auth-footer">
@@ -220,7 +221,7 @@ function Auth({ setup, onSuccess }: { setup: boolean; onSuccess: () => void }) {
           )}
           {recoveryHelp && (
             <Modal
-              title="Letâ€™s get you back in."
+              title="Let’s get you back in."
               onClose={() => setRecoveryHelp(false)}
             >
               <div className="simple-form">
@@ -720,6 +721,16 @@ export default function App() {
         />
         <span className="nav-label">WORKSPACE</span>
         <nav>
+          {auth.operator && (
+            <button
+              className={`nav-item ${page === "operator" ? "selected" : ""}`}
+              onClick={() => navigate("operator")}
+            >
+              <ShieldCheck size={19} />
+              <span>Control room</span>
+              <span className="nav-new">PLATFORM</span>
+            </button>
+          )}
           <button
             className={
               page === "codes" && !folder ? "nav-item selected" : "nav-item"
@@ -844,7 +855,9 @@ export default function App() {
           <div className="breadcrumb">
             Workspace<span>/</span>
             <strong>
-              {page === "analytics"
+              {page === "operator"
+                ? "Platform control room"
+                : page === "analytics"
                   ? "Analytics"
                   : page === "designs"
                     ? "Design studio"
@@ -871,7 +884,9 @@ export default function App() {
           </span>
         </header>
         <main className="main-content" key={page}>
-          {!auth.workspace && page !== "settings" ? (
+          {page === "operator" && auth.operator ? (
+            <OperatorConsole userId={auth.user.id} />
+          ) : !auth.workspace && page !== "settings" ? (
             <section className="settings-panel workspace-welcome">
               <h2>A fresh workspace awaits.</h2>
               <p>
@@ -951,7 +966,7 @@ export default function App() {
                     </div>
                   ) : (
                     <span className="viewer-notice">
-                      Viewer access Â· Browse and download
+                      Viewer access · Browse and download
                     </span>
                   )}
                 </div>
@@ -1089,7 +1104,7 @@ export default function App() {
                       >
                         <option value="newest">Newest first</option>
                         <option value="scans">Most scanned</option>
-                        <option value="name">Name Aâ€“Z</option>
+                        <option value="name">Name A–Z</option>
                       </select>
                       {filtered.length > 0 && (
                         <label className="select-all">
@@ -1127,7 +1142,7 @@ export default function App() {
                           aria-label="Search QR codes"
                           value={search}
                           onChange={(e) => setSearch(e.target.value)}
-                          placeholder="Search your codesâ€¦"
+                          placeholder="Search your codes…"
                         />
                       </div>
                       <div className="view-switch">
@@ -1199,7 +1214,7 @@ export default function App() {
                         <div className="empty-mini-card">
                           <QrCode size={45} />
                         </div>
-                        <span className="empty-leaf">âœ³</span>
+                        <span className="empty-leaf">✳</span>
                         <span className="empty-dot" />
                       </div>
                       <h3>
@@ -1332,7 +1347,7 @@ export default function App() {
                               }
                             >
                               <strong>
-                                {code.dynamic ? formatNumber(code.scans) : "â€”"}
+                                {code.dynamic ? formatNumber(code.scans) : "—"}
                               </strong>
                               <span>
                                 {code.dynamic ? "scans" : "untracked"}
@@ -1473,7 +1488,7 @@ export default function App() {
                   {filtered.length > 20 && (
                     <div className="pagination">
                       <span>
-                        {(pageNumber - 1) * 20 + 1}â€“
+                        {(pageNumber - 1) * 20 + 1}–
                         {Math.min(pageNumber * 20, filtered.length)} of{" "}
                         {filtered.length} codes
                       </span>

@@ -15,6 +15,7 @@
     "test:recovery": "node --test test/recovery.test.js",
     "format": "prettier --write src server shared scripts test *.json *.ts *.md *.yaml .github/workflows/*.yml",
     "recover": "node server/manage.js",
+    "operator": "node server/operator-cli.js",
     "backup": "node server/backup-cli.js backup",
     "restore": "node server/backup-cli.js restore",
     "predev": "node scripts/pdf-assets.js",

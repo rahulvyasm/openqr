@@ -12,6 +12,7 @@ import { migrateWorkspaces, registerWorkspaceRoutes } from "./workspaces.js";
 import { registerAuth } from "./auth.js";
 import { access, problem, canManage } from "./security.js";
 import { readBackupStatus } from "./backup-status.js";
+import { registerOperatorRoutes } from "./operator.js";
 import {
   createStorage,
   migratePublishing,
@@ -130,6 +131,11 @@ export function createApp({
     authLimit,
   );
   app.use("/api", requireAuth);
+  registerOperatorRoutes(app, db, storage, {
+    dbPath,
+    publicUrl: origin,
+    backupPolicy,
+  });
   registerWorkspaceRoutes(app, db, origin);
   app.use("/api", (req, _res, next) => {
     if (!req.workspace)

@@ -11,6 +11,7 @@ import {
   sessionLabel,
 } from "./security.js";
 import { createWorkspace, workspaceList } from "./workspaces.js";
+import { isOperator, operatorRole } from "./operator.js";
 
 const emailSchema = z
   .email()
@@ -105,6 +106,8 @@ export function registerAuth(app, db, origin, secureCookie, authLimit) {
     res.json({
       setupRequired: !db.prepare("SELECT id FROM users LIMIT 1").get(),
       user: req.user || null,
+      operator: isOperator(db, req.user?.id),
+      operatorRole: operatorRole(db, req.user?.id),
       publicUrl: origin,
       workspace: req.workspace || null,
       workspaces: req.user ? workspaceList(db, req.user.id) : [],

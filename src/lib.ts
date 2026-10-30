@@ -121,6 +121,8 @@ export type Workspace = {
   role: Role;
 };
 export type AuthState = {
+  operator?: boolean;
+  operatorRole?: string | null;
   setupRequired: boolean;
   user: User | null;
   publicUrl: string;
