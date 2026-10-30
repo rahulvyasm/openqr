@@ -71,7 +71,7 @@ import StudioHero, { type StudioDraft } from "./components/StudioHero";
 import CommandMenu from "./components/CommandMenu";
 import CampaignPulse from "./components/CampaignPulse";
 import ProfileMenu from "./components/ProfileMenu";
-import OperatorConsole from "./components/OperatorConsole";
+import PlansView from "./components/PlansView";
 import ScanChart from "./components/ScanChart";
 import "./studio.css";
 import { typeIcons as icons } from "./components/codeTypes";
@@ -84,6 +84,9 @@ import "@fontsource/manrope/latin-500.css";
 import "@fontsource/manrope/latin-600.css";
 import "@fontsource/manrope/latin-700.css";
 import "@fontsource/manrope/latin-800.css";
+const OperatorConsole = React.lazy(
+  () => import("./components/OperatorConsole"),
+);
 
 function Brand() {
   return (
@@ -264,7 +267,9 @@ export default function App() {
   const [folders, setFolders] = useState<Folder[]>([]);
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
   const [days, setDays] = useState(30);
-  const [page, setPage] = useState("codes");
+  const [page, setPage] = useState(() =>
+    window.location.pathname === "/control-room" ? "operator" : "codes",
+  );
   const [settingsTab, setSettingsTab] = useState("team");
   const [settingsVisit, setSettingsVisit] = useState(0);
   const [folder, setFolder] = useState("");
@@ -384,6 +389,14 @@ export default function App() {
           setDraft(undefined);
         }
         setAuth(data);
+        if (
+          data.user &&
+          !data.operator &&
+          window.location.pathname === "/control-room"
+        ) {
+          window.history.replaceState(null, "", "/");
+          setPage("codes");
+        } else if (data.operator && !data.workspace) setPage("operator");
       })
       .catch((e) => setBootError(e.message));
   const refresh = async () => {
@@ -415,6 +428,13 @@ export default function App() {
   };
   useEffect(() => {
     loadAuth();
+    const fromRoute = () => {
+      setPage(
+        window.location.pathname === "/control-room" ? "operator" : "codes",
+      );
+      setMobileNav(false);
+    };
+    window.addEventListener("popstate", fromRoute);
     const expire = () => setAuth((a) => (a ? { ...a, user: null } : a));
     window.addEventListener("session-expired", expire);
     const reloadAuth = () => {
@@ -442,6 +462,7 @@ export default function App() {
     window.addEventListener("hashchange", fromHash);
     window.addEventListener("permissions-changed", reloadAuth);
     return () => {
+      window.removeEventListener("popstate", fromRoute);
       window.removeEventListener("session-expired", expire);
       window.removeEventListener("hashchange", fromHash);
       window.removeEventListener("permissions-changed", reloadAuth);
@@ -593,6 +614,9 @@ export default function App() {
     setEditor("new");
   };
   const navigate = (next: string, f = "") => {
+    const nextPath = next === "operator" ? "/control-room" : "/";
+    if (window.location.pathname !== nextPath)
+      window.history.pushState(null, "", nextPath);
     window.scrollTo(0, 0);
     setPage(next);
     setSelection([]);
@@ -828,6 +852,15 @@ export default function App() {
             <Settings size={18} />
             <span>Workspace settings</span>
           </button>
+          {auth.workspace && (
+            <button
+              className={`nav-item ${page === "plans" ? "selected" : ""}`}
+              onClick={() => navigate("plans")}
+            >
+              <ShieldCheck size={18} />
+              <span>Plans &amp; usage</span>
+            </button>
+          )}
           <ProfileMenu
             name={auth.user.name}
             role={auth.workspace?.role || "Account"}
@@ -857,17 +890,19 @@ export default function App() {
             <strong>
               {page === "operator"
                 ? "Platform control room"
-                : page === "analytics"
-                  ? "Analytics"
-                  : page === "designs"
-                    ? "Design studio"
-                    : page === "media"
-                      ? "Media library"
-                      : page === "settings"
-                        ? "Settings"
-                        : folder
-                          ? folders.find((f) => f.id === folder)?.name
-                          : "QR workspace"}
+                : page === "plans"
+                  ? "Plans & usage"
+                  : page === "analytics"
+                    ? "Analytics"
+                    : page === "designs"
+                      ? "Design studio"
+                      : page === "media"
+                        ? "Media library"
+                        : page === "settings"
+                          ? "Settings"
+                          : folder
+                            ? folders.find((f) => f.id === folder)?.name
+                            : "QR workspace"}
             </strong>
           </div>
           <button
@@ -885,7 +920,16 @@ export default function App() {
         </header>
         <main className="main-content" key={page}>
           {page === "operator" && auth.operator ? (
-            <OperatorConsole userId={auth.user.id} />
+            <React.Suspense
+              fallback={
+                <div className="operator-loading">
+                  <Loader2 className="spin" />
+                  Loading company console…
+                </div>
+              }
+            >
+              <OperatorConsole userId={auth.user.id} />
+            </React.Suspense>
           ) : !auth.workspace && page !== "settings" ? (
             <section className="settings-panel workspace-welcome">
               <h2>A fresh workspace awaits.</h2>
@@ -894,6 +938,8 @@ export default function App() {
                 Your account settings are always available.
               </p>
             </section>
+          ) : page === "plans" ? (
+            <PlansView key={auth.workspace?.id} />
           ) : page === "media" ? (
             <MediaLibrary key={auth.workspace?.id} canEdit={canEdit} />
           ) : page === "designs" ? (

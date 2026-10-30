@@ -81,7 +81,7 @@ export const workspaceList = (db, userId) =>
     )
     .all(userId);
 
-export function registerWorkspaceRoutes(app, db, origin) {
+export function registerWorkspaceRoutes(app, db, origin, entitlements) {
   const current = (req, level = "read") => {
     if (!req.workspace) throw problem("Choose a workspace first.", 403);
     return access(db, req.user.id, req.workspace.id, level);
@@ -100,7 +100,10 @@ export function registerWorkspaceRoutes(app, db, origin) {
   );
   app.post("/api/workspaces", (req, res) => {
     const name = z.string().trim().min(1).max(80).parse(req.body.name);
-    const id = atomic(db, () => createWorkspace(db, req.user.id, name));
+    const id = atomic(db, () => {
+      entitlements?.assertWorkspaceCreate(req.user.id);
+      return createWorkspace(db, req.user.id, name);
+    });
     db.prepare("UPDATE sessions SET workspace_id=? WHERE token=?").run(
       id,
       req.sessionId,
@@ -175,6 +178,7 @@ export function registerWorkspaceRoutes(app, db, origin) {
       );
     const token = secret(),
       id = randomUUID();
+    entitlements?.assertInvite(w.id);
     db.prepare("INSERT INTO invitations VALUES (?,?,?,?,?,?,?,?,?,?)").run(
       id,
       w.id,
@@ -199,6 +203,7 @@ export function registerWorkspaceRoutes(app, db, origin) {
         .get(req.params.id, w.id);
     if (!row) throw problem("Invitation not found.", 404);
     allowedRole(w, row.role);
+    entitlements?.assertInvite(w.id, row.id);
     const token = secret();
     db.prepare("UPDATE invitations SET token=?,expires=? WHERE id=?").run(
       digest(token),

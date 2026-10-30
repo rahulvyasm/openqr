@@ -9,6 +9,8 @@ services:
       TRUST_PROXY: ${TRUST_PROXY:-0}
       BACKUP_INTERVAL_HOURS: ${BACKUP_INTERVAL_HOURS:-24}
       BACKUP_RETENTION: ${BACKUP_RETENTION:-7}
+      HOSTED_MODE: ${HOSTED_MODE:-false}
+      HOSTED_MAX_OWNED_WORKSPACES: ${HOSTED_MAX_OWNED_WORKSPACES:-3}
     volumes:
       - openqr-data:/app/data
     restart: unless-stopped

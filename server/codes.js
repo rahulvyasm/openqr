@@ -80,7 +80,14 @@ function transaction(db, fn) {
 const invalid = (message, status = 400) =>
   Object.assign(new Error(message), { status, domain: true });
 
-export function registerCodeRoutes(app, db, origin, analyticsSalt, storage) {
+export function registerCodeRoutes(
+  app,
+  db,
+  origin,
+  analyticsSalt,
+  storage,
+  entitlements,
+) {
   const serialize = (row) => ({
     id: row.id,
     slug: row.slug,
@@ -147,6 +154,7 @@ export function registerCodeRoutes(app, db, origin, analyticsSalt, storage) {
     return c;
   };
   const insert = (c, workspaceId, creatorId, sourceId) => {
+    entitlements?.assertCodeCreate(workspaceId);
     validateAssetReferences(db, c.data, workspaceId, c.type);
     const id = randomUUID(),
       slug = c.slug || randomBytes(8).toString("base64url");

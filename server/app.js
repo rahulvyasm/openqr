@@ -14,6 +14,11 @@ import { access, problem, canManage } from "./security.js";
 import { readBackupStatus } from "./backup-status.js";
 import { registerOperatorRoutes } from "./operator.js";
 import {
+  createEntitlements,
+  registerPlanRoutes,
+  registerPlanAdminRoutes,
+} from "./plans.js";
+import {
   createStorage,
   migratePublishing,
   migrateCollections,
@@ -28,6 +33,7 @@ export function createApp({
   storageDir,
   storageOptions = {},
   backupPolicy = null,
+  hosting = {},
 } = {}) {
   const origin = new URL(publicUrl).origin;
   if (!dbPath) {
@@ -123,12 +129,14 @@ export function createApp({
       message: { error: "Too many requests. Please wait a moment." },
     }),
   );
+  const entitlements = createEntitlements(db, storage, hosting);
   const { requireAuth } = registerAuth(
     app,
     db,
     origin,
     secureCookie,
     authLimit,
+    entitlements,
   );
   app.use("/api", requireAuth);
   registerOperatorRoutes(app, db, storage, {
@@ -136,7 +144,8 @@ export function createApp({
     publicUrl: origin,
     backupPolicy,
   });
-  registerWorkspaceRoutes(app, db, origin);
+  registerPlanAdminRoutes(app, db, entitlements);
+  registerWorkspaceRoutes(app, db, origin, entitlements);
   app.use("/api", (req, _res, next) => {
     if (!req.workspace)
       throw problem("Choose or create a workspace first.", 403);
@@ -167,7 +176,8 @@ export function createApp({
       req.assertEdit();
     next();
   });
-  registerAssetRoutes(app, db, storage);
+  registerAssetRoutes(app, db, storage, entitlements);
+  registerPlanRoutes(app, db, entitlements);
   app.get("/api/backups/status", async (req, res) => {
     if (!canManage(req.workspace.role))
       throw problem(
@@ -186,7 +196,7 @@ export function createApp({
       ),
     });
   });
-  registerCodeRoutes(app, db, origin, analyticsSalt, storage);
+  registerCodeRoutes(app, db, origin, analyticsSalt, storage, entitlements);
   app.get("/api/folders", (req, res) =>
     res.json(
       db

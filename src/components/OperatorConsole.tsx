@@ -20,6 +20,7 @@ import {
 import { api, formatNumber } from "../lib";
 import Modal from "./Modal";
 import StaffPanel from "./StaffPanel";
+import OperatorBilling from "./OperatorBilling";
 import { staffRoles } from "../../shared/operator-access.js";
 
 type WorkspaceRow = {
@@ -292,6 +293,7 @@ export default function OperatorConsole({ userId }: { userId: string }) {
           { id: "activity", label: "Activity", icon: Eye },
           { id: "operations", label: "Operations", icon: Server },
           { id: "staff", label: "Company staff", icon: Users },
+          { id: "billing", label: "Billing", icon: Database },
           { id: "access", label: "Access model", icon: ShieldCheck },
         ]
           .filter(
@@ -751,6 +753,9 @@ export default function OperatorConsole({ userId }: { userId: string }) {
                   </p>
                 </section>
               </div>
+            )}
+            {view === "billing" && (
+              <OperatorBilling onChange={() => setRevision((v) => v + 1)} />
             )}
             {view === "staff" && (
               <StaffPanel

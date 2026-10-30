@@ -78,8 +78,9 @@ npm run operator -- list
 ```
 
 Use the running installation's `DATA_DIR`. Refresh the app after a grant to see
-**Control room**. The console includes installation totals, hourly dynamic-link
-visits, recent workspace and operator activity, searchable paginated workspace and
+**Control room** at `/control-room` (restricted to company staff). The console
+includes installation totals, hourly dynamic-link visits, recent workspace and
+operator activity, searchable paginated workspace and
 account directories, storage/backup status, manual backups, and password-confirmed
 account session revocation. Data refreshes every five seconds and can be paused.
 It does not measure current online users, physical free disk space, or arbitrary
@@ -353,6 +354,40 @@ Auth cookies are HttpOnly and SameSite=Strict, and Secure when COOKIE_SECURE=tru
 Back up your complete DATA_DIR and preserve your public domain. Stop the server before making a filesystem copy of the SQLite directory, or use a SQLite-aware online backup tool. Copying only the main database while it is being written can omit data in the WAL. Never commit the database or `.env` to Git.
 
 ## Scope and roadmap
+
+### Hosted tiers and INR pricing
+
+The self-hosted edition includes all features without hosted QR/team plan caps.
+To operate a managed service, set `HOSTED_MODE=true`. Each workspace then receives
+a hosted tier with the same feature set and different resource limits:
+
+| Tier | QR codes | Media storage | Team seats |
+| --- | ---: | ---: | ---: |
+| Free | 25 | 100 MB | 3 |
+| Creator | 1,000 | 5 GB | 10 |
+| Business | 10,000 | 50 GB | 50 |
+
+These initial tier limits live in `shared/plans.js`. Set display prices in whole
+INR per workspace/month using `PLAN_CREATOR_MONTHLY_INR` and
+`PLAN_BUSINESS_MONTHLY_INR`. Prices are unannounced until configured. For Docker,
+also pass those optional price variables to the container in `compose.yaml`.
+`HOSTED_MAX_OWNED_WORKSPACES` defaults to 3 per account, independently of tier limits.
+Pending invitations reserve team seats; acceptance rechecks capacity after a downgrade.
+
+**Online payment collection is not implemented or active.** No checkout link,
+subscription charge, or paid-invoice status is fabricated. Company Billing staff
+and Super Admins can provision manual access with password confirmation under
+**Control room → Billing**. Payment-provider integration, recurring-charge handling,
+verified webhooks, and final INR amounts are still required before selling hosted
+subscriptions. Manual access is labeled as operator-provisioned, not paid.
+
+**Plans & usage** shows the current workspace plan, actual usage, and the hosted
+catalog. Limits are enforced server-side across ordinary creation, duplication,
+atomic bulk imports, uploads, and invitations. A downgrade blocks new additions
+above the new limit; it never deletes saved content or pauses existing printed links.
+Hosted storage limits replace the self-hosted `WORKSPACE_STORAGE_MB` quota;
+per-file upload limits still apply to every plan. Staff privileges and workspace
+plans are independent: a paid plan never grants company control-room access.
 
 v0.3 supports multiple workspaces and invited teams on a single self-hosted SQLite instance. The [competitive roadmap](docs/ROADMAP.md) covers custom domains, file/media pages, API keys, routing rules, automated backups, PostgreSQL-backed hosted operations, and further hardening. Billing and subscription limits are outside this self-hosted edition. A private GitHub repository stays private; the MIT license does not automatically publish its contents.
 

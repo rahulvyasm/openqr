@@ -43,7 +43,14 @@ export function issueRecovery(db, email, origin) {
   });
   return `${new URL(origin).origin}/#reset=${token}`;
 }
-export function registerAuth(app, db, origin, secureCookie, authLimit) {
+export function registerAuth(
+  app,
+  db,
+  origin,
+  secureCookie,
+  authLimit,
+  entitlements,
+) {
   const cookieOptions = {
     httpOnly: true,
     sameSite: "strict",
@@ -108,6 +115,7 @@ export function registerAuth(app, db, origin, secureCookie, authLimit) {
       user: req.user || null,
       operator: isOperator(db, req.user?.id),
       operatorRole: operatorRole(db, req.user?.id),
+      hosted: !!entitlements?.enabled,
       publicUrl: origin,
       workspace: req.workspace || null,
       workspaces: req.user ? workspaceList(db, req.user.id) : [],
@@ -208,6 +216,7 @@ export function registerAuth(app, db, origin, secureCookie, authLimit) {
     }
     const id = atomic(db, () => {
       const live = invitation(token);
+      entitlements?.assertAccept(live.workspace_id);
       let userId = existing?.id;
       if (!userId) {
         if (db.prepare("SELECT id FROM users WHERE email=?").get(live.email))

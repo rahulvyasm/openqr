@@ -67,6 +67,12 @@ Acceptance: restoring a backup preserves printed links, workspace memberships, a
 
 ## Then: publishing and integrations
 
+The company control room now separates Super Admin, Operations, Support, Billing,
+and Analyst access from customer workspace roles. Hosted tier entitlements and an
+INR plan catalog are implemented, including atomic QR caps, storage quotas, seat
+reservations, and manual staff provisioning. Online payment processing, verified
+provider events, final pricing, and commercial launch operations remain future work.
+
 - Add restaurant menus and more page templates. Galleries, audio/video, events, app-store routing, S3-compatible storage, and quotas shipped in v0.5; retention controls and malware scanning remain.
 - Custom domains with verified ownership, certificate status, domain-to-workspace mapping, and protection against domain takeover. Existing domains must remain routable when codes are edited.
 - Scoped, revocable API keys, published API documentation, per-key rate limits, and idempotent creation for integrations.

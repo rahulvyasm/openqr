@@ -239,7 +239,8 @@ export function validateAssetReferences(db, data, workspaceId, type) {
         throw problem("Choose gallery images from this workspace.");
     }
 }
-export function registerAssetRoutes(app, db, storage) {
+export function registerAssetRoutes(app, db, storage,entitlements) {
+  const workspaceQuota = workspaceId => entitlements?.quota(workspaceId) ?? storage.quota;
   let uploads=0;
   app.get("/api/storage", (req, res) =>
     res.json({
@@ -248,7 +249,7 @@ export function registerAssetRoutes(app, db, storage) {
           "SELECT COALESCE(SUM(size),0) total FROM assets WHERE workspace_id=?",
         )
         .get(req.workspace.id).total,
-      limitBytes: storage.quota,
+      limitBytes: workspaceQuota(req.workspace.id),
       maxUploadBytes: storage.maxUpload,
       backend: storage.kind,
     }),
@@ -356,7 +357,7 @@ export function registerAssetRoutes(app, db, storage) {
             "SELECT COALESCE(SUM(size),0) total FROM assets WHERE workspace_id=?",
           )
           .get(req.workspace.id).total;
-        if (used + bytes.length > storage.quota)
+        if (used + bytes.length > workspaceQuota(req.workspace.id))
           throw problem(
             "This workspace has reached its storage limit. Remove unused files or ask the server operator to increase it.",
             413,
@@ -367,6 +368,8 @@ export function registerAssetRoutes(app, db, storage) {
           if(req.aborted||res.destroyed)throw problem('Upload cancelled.');
           req.assertEdit();
           db.exec('BEGIN IMMEDIATE');inserting=true;
+          const currentUsed=db.prepare('SELECT COALESCE(SUM(size),0) total FROM assets WHERE workspace_id=?').get(req.workspace.id).total;
+          if(currentUsed+bytes.length>workspaceQuota(req.workspace.id))throw problem('This workspace has reached its storage limit.',413);
           db.prepare(
             "INSERT INTO assets (id,workspace_id,user_id,name,kind,mime,size,storage_key,sha256,pages,created_at,metadata) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
           ).run(

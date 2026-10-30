@@ -123,6 +123,7 @@ export type Workspace = {
 export type AuthState = {
   operator?: boolean;
   operatorRole?: string | null;
+  hosted?: boolean;
   setupRequired: boolean;
   user: User | null;
   publicUrl: string;

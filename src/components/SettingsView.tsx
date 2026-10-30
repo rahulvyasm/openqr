@@ -29,6 +29,7 @@ const eventNames: Record<string, string> = {
   "code.resumed": "Resumed QR code",
   "code.moved": "Moved QR code",
   "workspace.created": "Created workspace",
+  "workspace.plan_changed": "Changed hosted plan",
   "workspace.renamed": "Renamed workspace",
   "invitation.created": "Created invitation",
   "invitation.renewed": "Renewed invitation",

@@ -77,6 +77,24 @@ export function loadConfig(env = process.env) {
     trustProxy: flag(env, "TRUST_PROXY", "0", "1", "0"),
     backupHours,
     retention: integer(env, "BACKUP_RETENTION", 7, 1, Number.MAX_SAFE_INTEGER),
+    hosting: {
+      enabled: flag(env, "HOSTED_MODE", "false"),
+      maxOwnedWorkspaces: integer(
+        env,
+        "HOSTED_MAX_OWNED_WORKSPACES",
+        3,
+        1,
+        10000,
+      ),
+      creatorINR:
+        env.PLAN_CREATOR_MONTHLY_INR === undefined
+          ? null
+          : integer(env, "PLAN_CREATOR_MONTHLY_INR", 0, 1, 10000000),
+      businessINR:
+        env.PLAN_BUSINESS_MONTHLY_INR === undefined
+          ? null
+          : integer(env, "PLAN_BUSINESS_MONTHLY_INR", 0, 1, 10000000),
+    },
     storageOptions: storageOptionsFromEnv(env),
   };
 }
