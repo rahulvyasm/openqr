@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { problem } from "./security.js";
 import { collectionTypes, validateCollection } from "./collections.js";
+import { socialLinkError, socialUrlKey } from "../shared/social.js";
 export const hostedTypes = [
   "links",
   "pdf",
@@ -75,6 +76,7 @@ export function validateHosted(code) {
     }
     if (!Array.isArray(links) || links.length > 12)
       throw problem("Use up to 12 page links.");
+    const seenLinks = new Set();
     for (const l of links) {
       if (
         !l ||
@@ -86,20 +88,14 @@ export function validateHosted(code) {
       )
         throw problem("Enter a title and URL for every page link.");
       safeWebsite(l.url);
-      if (
-        l.platform &&
-        ![
-          "website",
-          "instagram",
-          "facebook",
-          "linkedin",
-          "youtube",
-          "tiktok",
-          "x",
-          "github",
-        ].includes(l.platform)
-      )
-        throw problem("Choose a supported social platform.");
+      const socialError = socialLinkError(l);
+      if (socialError) throw problem(socialError);
+      if (code.type === "social") {
+        const key = socialUrlKey(l.url);
+        if (seenLinks.has(key))
+          throw problem("Each social link must have a different destination.");
+        seenLinks.add(key);
+      }
     }
   }
   if (code.type === "social" && (!d.links || JSON.parse(d.links).length === 0))

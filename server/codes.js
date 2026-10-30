@@ -1,4 +1,5 @@
 import { randomBytes, randomUUID, createHash } from "node:crypto";
+import { audit } from "./security.js";
 import { z } from "zod";
 import QRCode from "qrcode";
 import { zipSync, strToU8 } from "fflate";
@@ -145,7 +146,7 @@ export function registerCodeRoutes(app, db, origin, analyticsSalt, storage) {
       throw invalid("Only website codes support UTM tags.");
     return c;
   };
-  const insert = (c, workspaceId, creatorId) => {
+  const insert = (c, workspaceId, creatorId, sourceId) => {
     validateAssetReferences(db, c.data, workspaceId, c.type);
     const id = randomUUID(),
       slug = c.slug || randomBytes(8).toString("base64url");
@@ -170,6 +171,19 @@ export function registerCodeRoutes(app, db, origin, analyticsSalt, storage) {
       workspaceId,
       JSON.stringify(c.pageOptions || {}),
     );
+    audit(
+      db,
+      workspaceId,
+      creatorId,
+      sourceId ? "code.duplicated" : "code.created",
+      id,
+      {
+        name: c.name,
+        type: c.type,
+        dynamic: c.dynamic,
+        ...(sourceId ? { sourceId } : {}),
+      },
+    );
     return serialize(getCode(id, workspaceId));
   };
   app.get("/api/codes", (req, res) =>
@@ -186,7 +200,7 @@ export function registerCodeRoutes(app, db, origin, analyticsSalt, storage) {
     const c = await validate(req.body, req.workspace.id);
     const result = await storage.exclusive(() => {
       req.assertEdit();
-      return insert(c, req.workspace.id, req.user.id);
+      return transaction(db, () => insert(c, req.workspace.id, req.user.id));
     });
     res.status(201).json(result);
   });
@@ -262,6 +276,25 @@ export function registerCodeRoutes(app, db, origin, analyticsSalt, storage) {
             +(input.action === "resume"),
             row.id,
           );
+        if (["delete", "move"].includes(input.action) || row.dynamic)
+          audit(
+            db,
+            req.workspace.id,
+            req.user.id,
+            {
+              delete: "code.deleted",
+              move: "code.moved",
+              pause: "code.paused",
+              resume: "code.resumed",
+            }[input.action],
+            row.id,
+            {
+              name: row.name,
+              ...(input.action === "move"
+                ? { folderId: input.folderId || null }
+                : {}),
+            },
+          );
       }
     });
     res.json({
@@ -322,7 +355,9 @@ export function registerCodeRoutes(app, db, origin, analyticsSalt, storage) {
     copy.name = `${copy.name.slice(0, 93)} (copy)`;
     const result = await storage.exclusive(() => {
       req.assertEdit();
-      return insert(copy, req.workspace.id, req.user.id);
+      return transaction(db, () =>
+        insert(copy, req.workspace.id, req.user.id, row.id),
+      );
     });
     res.status(201).json(result);
   });
@@ -338,35 +373,54 @@ export function registerCodeRoutes(app, db, origin, analyticsSalt, storage) {
       );
     if (!old.dynamic && payload(c) !== payload(serialize(old)))
       throw invalid("Static QR content cannot be edited. Create a new code.");
-    await storage.exclusive(() => {
-      req.assertEdit();
-      if (!getCode(old.id, req.workspace.id))
-        throw invalid("QR code not found.", 404);
-      validateAssetReferences(db, c.data, req.workspace.id, c.type);
-      db.prepare(
-        "UPDATE codes SET name=?,data=?,folder_id=?,color=?,active=?,design=?,campaign=?,page_options=? WHERE id=? AND workspace_id=?",
-      ).run(
-        c.name,
-        JSON.stringify(c.data),
-        c.folderId,
-        c.color,
-        +c.active,
-        JSON.stringify(c.design),
-        JSON.stringify(c.campaign),
-        JSON.stringify(c.pageOptions),
-        old.id,
-        req.workspace.id,
-      );
-    });
+    await storage.exclusive(() =>
+      transaction(db, () => {
+        req.assertEdit();
+        if (!getCode(old.id, req.workspace.id))
+          throw invalid("QR code not found.", 404);
+        validateAssetReferences(db, c.data, req.workspace.id, c.type);
+        db.prepare(
+          "UPDATE codes SET name=?,data=?,folder_id=?,color=?,active=?,design=?,campaign=?,page_options=? WHERE id=? AND workspace_id=?",
+        ).run(
+          c.name,
+          JSON.stringify(c.data),
+          c.folderId,
+          c.color,
+          +c.active,
+          JSON.stringify(c.design),
+          JSON.stringify(c.campaign),
+          JSON.stringify(c.pageOptions),
+          old.id,
+          req.workspace.id,
+        );
+        audit(
+          db,
+          req.workspace.id,
+          req.user.id,
+          +c.active !== old.active && old.dynamic
+            ? c.active
+              ? "code.resumed"
+              : "code.paused"
+            : "code.updated",
+          old.id,
+          { name: c.name, type: c.type },
+        );
+      }),
+    );
     res.json(serialize(getCode(old.id, req.workspace.id)));
   });
   app.delete("/api/codes/:id", (req, res) => {
-    if (!getCode(req.params.id, req.workspace.id))
-      throw invalid("QR code not found.", 404);
-    db.prepare("DELETE FROM codes WHERE id=? AND workspace_id=?").run(
-      req.params.id,
-      req.workspace.id,
-    );
+    const row = getCode(req.params.id, req.workspace.id);
+    if (!row) throw invalid("QR code not found.", 404);
+    transaction(db, () => {
+      db.prepare("DELETE FROM codes WHERE id=? AND workspace_id=?").run(
+        req.params.id,
+        req.workspace.id,
+      );
+      audit(db, req.workspace.id, req.user.id, "code.deleted", row.id, {
+        name: row.name,
+      });
+    });
     res.json({ ok: true });
   });
   app.get("/api/codes/:id/download", async (req, res) => {

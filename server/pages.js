@@ -1,5 +1,6 @@
 import { xml } from "../shared/qr.js";
 import { collectionContent, collectionCss } from "./collection-pages.js";
+import { socialIconSvg } from "../shared/social.js";
 
 export function shell(title, body, color = "#285b48") {
   return `<!doctype html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>${xml(title)} · OpenQR</title><style>*{box-sizing:border-box}body{margin:0;min-height:100vh;background:#f4f7f1;color:#253b30;font:16px/1.7 system-ui,sans-serif;display:flex;align-items:center;justify-content:center;padding:30px 20px}main{width:100%;max-width:460px;text-align:center}h1{font-size:30px;line-height:1.3;letter-spacing:-1px;margin:18px 0 12px;overflow-wrap:anywhere}p{color:#73816b;white-space:pre-line;overflow-wrap:anywhere}.avatar{width:76px;height:76px;border-radius:25px;display:grid;place-items:center;color:white;background:${xml(color)};font-size:28px;font-weight:600;margin:0 auto}.links{display:grid;gap:12px;margin:30px 0}a.link{padding:16px 20px;border:1px solid #dfe7d7;border-radius:12px;background:#fff;color:${xml(color)};text-decoration:none;font-size:15px;font-weight:600;display:flex;justify-content:space-between;gap:15px;text-align:left;overflow-wrap:anywhere}a.link:hover{border-color:${xml(color)}}footer{font-size:12px;color:#9eaa95;margin-top:40px}small{font-size:12px;color:#95a189}</style></head><body><main>${body}<footer>Created with OpenQR</footer></main></body></html>`;
@@ -21,7 +22,7 @@ export function hostedPage(code, assets, ticket) {
     ? `<img class="portrait" src="${media(d.portraitId)}" alt="${xml(title)}">`
     : `<div class="identity">${xml(title.trim().slice(0, 2).toUpperCase())}</div>`;
   const link = (label, url, platform = "website") =>
-    `<a class="action" href="${xml(url)}" rel="noopener noreferrer nofollow"><span class="platform">${xml({ instagram: "◎", facebook: "f", linkedin: "in", youtube: "▶", tiktok: "♪", x: "𝕏", github: "⌘", website: "↗" }[platform] || "↗")}</span><span>${xml(label)}</span><b>↗</b></a>`;
+    `<a class="action" href="${xml(url)}" rel="noopener noreferrer nofollow"><span class="platform">${socialIconSvg(platform)}</span><span>${xml(label)}</span><b aria-hidden="true">↗</b></a>`;
   const buttons = [];
   if (["contact", "business"].includes(code.type)) {
     if (d.phone)
