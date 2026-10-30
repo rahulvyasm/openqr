@@ -97,6 +97,8 @@ account (password-confirmed, with a recorded reason; sessions end and sign-in is
 blocked, while content and printed links are untouched). Company staff accounts
 cannot be suspended here.
 
+Customers can contact support from **Settings → Support**; they see only their own requests and replies staff mark as visible (internal notes stay hidden), and a customer reply reopens a resolved request.
+
 Privacy boundaries: staff see masked email addresses by default and must give a
 reason to reveal one. QR content, visitor records, uploaded media, and passwords
 are never exposed through the control room. Customer views, reveals, case

@@ -28,6 +28,15 @@ export function registerSupportRoutes(app, db, entitlements) {
     CREATE INDEX IF NOT EXISTS support_cases_status ON support_cases(status,updated_at);
     CREATE INDEX IF NOT EXISTS support_cases_workspace ON support_cases(workspace_id);
   `);
+  if (
+    !db
+      .prepare("PRAGMA table_info(support_notes)")
+      .all()
+      .some((column) => column.name === "visibility")
+  )
+    db.exec(
+      "ALTER TABLE support_notes ADD COLUMN visibility TEXT NOT NULL DEFAULT 'internal'",
+    );
   const now = () => new Date().toISOString();
   const log = (actor, action, type, id, reason = "") =>
     db
@@ -279,7 +288,7 @@ export function registerSupportRoutes(app, db, entitlements) {
       ...row,
       notes: db
         .prepare(
-          "SELECT n.id,n.body,n.created_at AS at,COALESCE(u.name,'Removed account') AS author FROM support_notes n LEFT JOIN users u ON u.id=n.author_id WHERE n.case_number=? ORDER BY n.id DESC LIMIT 100",
+          "SELECT n.id,n.body,n.visibility,n.created_at AS at,COALESCE(u.name,'Removed account') AS author FROM support_notes n LEFT JOIN users u ON u.id=n.author_id WHERE n.case_number=? ORDER BY n.id DESC LIMIT 100",
         )
         .all(id),
     });
@@ -287,14 +296,17 @@ export function registerSupportRoutes(app, db, entitlements) {
   app.post("/api/operator/cases/:number/notes", (req, res) => {
     need(req, "cases:manage");
     const id = number(req),
-      { body } = z
-        .object({ body: z.string().trim().min(1).max(2000) })
+      { body, visibility } = z
+        .object({
+          body: z.string().trim().min(1).max(2000),
+          visibility: z.enum(["internal", "public"]).default("internal"),
+        })
         .parse(req.body);
     caseRow(id);
     atomic(db, () => {
       db.prepare(
-        "INSERT INTO support_notes(case_number,author_id,body,created_at) VALUES (?,?,?,?)",
-      ).run(id, req.user.id, body, now());
+        "INSERT INTO support_notes(case_number,author_id,body,created_at,visibility) VALUES (?,?,?,?,?)",
+      ).run(id, req.user.id, body, now(), visibility);
       db.prepare("UPDATE support_cases SET updated_at=? WHERE number=?").run(
         now(),
         id,
@@ -339,6 +351,107 @@ export function registerSupportRoutes(app, db, entitlements) {
     });
     res.json(caseRow(id));
   });
+
+  // Customer-facing requests: members see only their own requests and staff replies marked public.
+  const mine = (req, id) => {
+    const row = db
+      .prepare(
+        "SELECT number,category,status,subject,created_at AS createdAt,updated_at AS updatedAt FROM support_cases WHERE number=? AND user_id=? AND workspace_id=?",
+      )
+      .get(id, req.user.id, req.workspace?.id);
+    if (!row) throw problem("Request not found.", 404);
+    return row;
+  };
+  const requestLimit = rateLimit({
+    windowMs: 60 * 60000,
+    limit: 10,
+    standardHeaders: "draft-8",
+    legacyHeaders: false,
+    message: { error: "Too many support requests. Try again later." },
+  });
+  app.get("/api/support/requests", (req, res) => {
+    if (!req.workspace) throw problem("Choose a workspace first.", 403);
+    res.json(
+      db
+        .prepare(
+          "SELECT number,category,status,subject,updated_at AS updatedAt FROM support_cases WHERE user_id=? AND workspace_id=? ORDER BY updated_at DESC LIMIT 50",
+        )
+        .all(req.user.id, req.workspace.id),
+    );
+  });
+  app.post("/api/support/requests", requestLimit, (req, res) => {
+    if (!req.workspace) throw problem("Choose a workspace first.", 403);
+    const input = z
+      .object({
+        category: z.enum(caseCategories),
+        subject: z.string().trim().min(3).max(120),
+        message: z.string().trim().min(1).max(2000),
+      })
+      .parse(req.body);
+    const id = atomic(db, () => {
+      const at = now(),
+        created = Number(
+          db
+            .prepare(
+              "INSERT INTO support_cases(workspace_id,user_id,category,priority,status,subject,created_by,assigned_to,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
+            )
+            .run(
+              req.workspace.id,
+              req.user.id,
+              input.category,
+              "normal",
+              "open",
+              input.subject,
+              req.user.id,
+              null,
+              at,
+              at,
+            ).lastInsertRowid,
+        );
+      db.prepare(
+        "INSERT INTO support_notes(case_number,author_id,body,created_at,visibility) VALUES (?,?,?,?,'public')",
+      ).run(created, req.user.id, input.message, at);
+      return created;
+    });
+    res.status(201).json(mine(req, id));
+  });
+  app.get("/api/support/requests/:number", (req, res) => {
+    const id = number(req);
+    res.json({
+      ...mine(req, id),
+      replies: db
+        .prepare(
+          "SELECT n.id,n.body,n.created_at AS at,(n.author_id=?) AS you FROM support_notes n WHERE n.case_number=? AND n.visibility='public' ORDER BY n.id DESC LIMIT 100",
+        )
+        .all(req.user.id, id)
+        .map((reply) => ({ ...reply, you: !!reply.you })),
+    });
+  });
+  app.post(
+    "/api/support/requests/:number/replies",
+    requestLimit,
+    (req, res) => {
+      const id = number(req),
+        request = mine(req, id),
+        { message } = z
+          .object({ message: z.string().trim().min(1).max(2000) })
+          .parse(req.body);
+      if (request.status === "closed")
+        throw problem(
+          "This request is closed. Please open a new request.",
+          409,
+        );
+      atomic(db, () => {
+        db.prepare(
+          "INSERT INTO support_notes(case_number,author_id,body,created_at,visibility) VALUES (?,?,?,?,'public')",
+        ).run(id, req.user.id, message, now());
+        db.prepare(
+          "UPDATE support_cases SET updated_at=?,status=CASE WHEN status='resolved' THEN 'open' ELSE status END WHERE number=?",
+        ).run(now(), id);
+      });
+      res.status(201).json({ ok: true });
+    },
+  );
 
   app.get("/api/operator/audit", (req, res) => {
     need(req, "audit:read");

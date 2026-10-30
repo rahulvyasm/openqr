@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import {
   Check,
   ClipboardList,
+  LifeBuoy,
   Globe,
   Settings2,
   ShieldCheck,
@@ -11,6 +12,7 @@ import {
 import { api, mayManage, type AuthState } from "../lib";
 import TeamPanel from "./TeamPanel";
 import AccountPanel from "./AccountPanel";
+import SupportPanel from "./SupportPanel";
 import StorageStatus from "./StorageStatus";
 type Audit = {
   id: number;
@@ -89,6 +91,7 @@ export default function SettingsView({
           { id: "team", label: "Team", icon: Users },
           { id: "workspace", label: "Workspace", icon: Settings2 },
           { id: "account", label: "My account", icon: UserRound },
+          { id: "support", label: "Support", icon: LifeBuoy },
           ...(manager
             ? [{ id: "audit", label: "Activity", icon: ClipboardList }]
             : []),
@@ -115,6 +118,8 @@ export default function SettingsView({
           <h2>Make yourself a workspace.</h2>
           <p>Use the workspace menu to create a home for your next idea.</p>
         </div>
+      ) : tab === "support" ? (
+        <SupportPanel notify={notify} />
       ) : tab === "team" ? (
         <TeamPanel auth={auth} onAuthChange={onAuthChange} notify={notify} />
       ) : tab === "workspace" ? (

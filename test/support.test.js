@@ -213,3 +213,108 @@ test("support staff work cases and customer privacy is enforced and audited", as
     "Customer asked for help with SUP-1",
   );
 });
+
+test("customers file requests, see only their own and public replies, and cannot reach others", async (t) => {
+  const { setup, db, base } = await fixture(t);
+  await setup();
+  const owner = db.prepare("SELECT * FROM users").get();
+  const workspace = db.prepare("SELECT id FROM workspaces").get().id;
+  const headers = { origin: "http://localhost:5173" };
+  async function member(name, role) {
+    const id = randomUUID(),
+      email = `${name}@example.com`;
+    db.prepare(
+      "INSERT INTO users(id,email,name,salt,password) VALUES (?,?,?,?,?)",
+    ).run(id, email, name, owner.salt, owner.password);
+    db.prepare(
+      "INSERT INTO members(workspace_id,user_id,role,joined_at) VALUES (?,?,?,?)",
+    ).run(workspace, id, "viewer", new Date().toISOString());
+    if (role) setOperator(db, id, true, role);
+    const response = await fetch(base + "/api/auth/login", {
+      method: "POST",
+      headers: { ...headers, "content-type": "application/json" },
+      body: JSON.stringify({ email, password: "a-secure-test-password" }),
+    });
+    const cookie = response.headers.get("set-cookie").split(";")[0];
+    return {
+      call: (path, body, method) =>
+        fetch(base + path, {
+          method: method || (body ? "POST" : "GET"),
+          headers: {
+            ...headers,
+            cookie,
+            ...(body ? { "content-type": "application/json" } : {}),
+          },
+          body: body ? JSON.stringify(body) : undefined,
+        }),
+    };
+  }
+  const alice = await member("alice"),
+    bob = await member("bob"),
+    support = await member("support", "support");
+  const made = await alice.call("/api/support/requests", {
+    category: "billing",
+    subject: "Wrong invoice",
+    message: "My plan shows Free after paying.",
+  });
+  assert.equal(made.status, 201);
+  const { number } = await made.json();
+  assert.equal((await bob.call(`/api/support/requests/${number}`)).status, 404);
+  assert.equal(
+    (
+      await bob.call(`/api/support/requests/${number}/replies`, {
+        message: "hi",
+      })
+    ).status,
+    404,
+  );
+  assert.deepEqual(await (await bob.call("/api/support/requests")).json(), []);
+  // Staff internal notes stay hidden; public replies show.
+  const note = (body, visibility) =>
+    support.call(`/api/operator/cases/${number}/notes`, { body, visibility });
+  assert.equal(
+    (await note("Internal: check provider", "internal")).status,
+    201,
+  );
+  assert.equal((await note("We are fixing your plan.", "public")).status, 201);
+  const seen = await (
+    await alice.call(`/api/support/requests/${number}`)
+  ).json();
+  assert.deepEqual(seen.replies.map((r) => r.body).sort(), [
+    "My plan shows Free after paying.",
+    "We are fixing your plan.",
+  ]);
+  assert.doesNotMatch(JSON.stringify(seen), /Internal|assigned|workspaceId/);
+  // A customer reply reopens a resolved case; closed cases refuse replies.
+  await support.call(
+    `/api/operator/cases/${number}`,
+    { status: "resolved" },
+    "PATCH",
+  );
+  assert.equal(
+    (
+      await alice.call(`/api/support/requests/${number}/replies`, {
+        message: "Still wrong.",
+      })
+    ).status,
+    201,
+  );
+  assert.equal(
+    (await (await alice.call(`/api/support/requests/${number}`)).json()).status,
+    "open",
+  );
+  await support.call(
+    `/api/operator/cases/${number}`,
+    { status: "closed" },
+    "PATCH",
+  );
+  assert.equal(
+    (
+      await alice.call(`/api/support/requests/${number}/replies`, {
+        message: "Hello?",
+      })
+    ).status,
+    409,
+  );
+  assert.equal((await alice.call("/api/operator/cases")).status, 403);
+});

@@ -22,7 +22,13 @@ type CaseDetail = CaseRow & {
   contact: string | null;
   assignedTo: string | null;
   createdAt: string;
-  notes: { id: number; body: string; at: string; author: string }[];
+  notes: {
+    id: number;
+    body: string;
+    visibility: string;
+    at: string;
+    author: string;
+  }[];
 };
 type Member = {
   id: string;
@@ -318,16 +324,25 @@ function CaseDialog({
             onSubmit={(event: FormEvent<HTMLFormElement>) => {
               event.preventDefault();
               const form = event.currentTarget,
-                body = String(new FormData(form).get("body") || "");
+                data = new FormData(form),
+                body = String(data.get("body") || ""),
+                visibility = data.get("public") ? "public" : "internal";
               void run(async () => {
-                await api(`/operator/cases/${number}/notes`, { body });
+                await api(`/operator/cases/${number}/notes`, {
+                  body,
+                  visibility,
+                });
                 form.reset();
               });
             }}
           >
             <label>
-              Add an internal note
+              Add a note
               <textarea name="body" required maxLength={2000} rows={3} />
+            </label>
+            <label>
+              <input type="checkbox" name="public" /> Reply visible to the
+              customer
             </label>
             <button className="button primary small" disabled={busy}>
               Add note
@@ -342,7 +357,12 @@ function CaseDialog({
             {item.notes.map((note) => (
               <article key={note.id}>
                 <div>
-                  <strong>{note.author}</strong>
+                  <strong>
+                    {note.author}
+                    {note.visibility === "public"
+                      ? " · visible to customer"
+                      : " · internal"}
+                  </strong>
                   <p>{note.body}</p>
                   <small>{when(note.at)}</small>
                 </div>
