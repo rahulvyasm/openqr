@@ -99,6 +99,8 @@ cannot be suspended here.
 
 Customers can contact support from **Settings → Support**; they see only their own requests and replies staff mark as visible (internal notes stay hidden), and a customer reply reopens a resolved request.
 
+Neither side needs email: customers see a badge on **Workspace settings** and a "New reply" marker on the request, and staff see a count on **Control room** and the **Cases** tab for open cases where the customer spoke last. Counts refresh every 30 seconds.
+
 Privacy boundaries: staff see masked email addresses by default and must give a
 reason to reveal one. QR content, visitor records, uploaded media, and passwords
 are never exposed through the control room. Customer views, reveals, case

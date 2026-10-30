@@ -9,6 +9,7 @@ type Request = {
   status: string;
   subject: string;
   updatedAt: string;
+  unread?: boolean;
 };
 type Detail = Request & {
   createdAt: string;
@@ -35,7 +36,10 @@ export default function SupportPanel({
   const load = useCallback(
     () =>
       api<Request[]>("/support/requests")
-        .then(setRequests)
+        .then((rows) => {
+          setRequests(rows);
+          window.dispatchEvent(new Event("support-changed"));
+        })
         .catch((e) => setError(e.message)),
     [],
   );
@@ -127,6 +131,7 @@ export default function SupportPanel({
                   SUP-{r.number}
                 </button>{" "}
                 {r.subject} · {r.status} · {when(r.updatedAt)}
+                {r.unread && <strong className="nav-alert"> New reply</strong>}
               </li>
             ))}
           </ul>
@@ -158,7 +163,10 @@ function RequestDialog({
   const load = useCallback(
     () =>
       api<Detail>(`/support/requests/${number}`)
-        .then(setItem)
+        .then((value) => {
+          setItem(value);
+          window.dispatchEvent(new Event("support-changed"));
+        })
         .catch((e) => setError(e.message)),
     [number],
   );

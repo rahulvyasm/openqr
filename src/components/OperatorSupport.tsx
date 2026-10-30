@@ -16,6 +16,7 @@ type CaseRow = {
   status: string;
   subject: string;
   updatedAt: string;
+  needsReply?: boolean;
   assignee: string | null;
 };
 type CaseDetail = CaseRow & {
@@ -187,6 +188,9 @@ export function OperatorCases({
                     <strong>SUP-{row.number}</strong>
                   </button>
                   <small>{row.subject}</small>
+                  {row.needsReply && (
+                    <span className="nav-alert">Customer replied</span>
+                  )}
                 </td>
                 <td>{row.workspace}</td>
                 <td>{row.category}</td>
@@ -241,7 +245,10 @@ function CaseDialog({
   const load = useCallback(
     () =>
       api<CaseDetail>(`/operator/cases/${number}`)
-        .then(setItem)
+        .then((value) => {
+          setItem(value);
+          window.dispatchEvent(new Event("support-changed"));
+        })
         .catch((e) => setError(e.message)),
     [number],
   );

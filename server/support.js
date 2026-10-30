@@ -37,7 +37,17 @@ export function registerSupportRoutes(app, db, entitlements) {
     db.exec(
       "ALTER TABLE support_notes ADD COLUMN visibility TEXT NOT NULL DEFAULT 'internal'",
     );
+  if (
+    !db
+      .prepare("PRAGMA table_info(support_cases)")
+      .all()
+      .some((column) => column.name === "customer_seen_at")
+  )
+    db.exec("ALTER TABLE support_cases ADD COLUMN customer_seen_at TEXT");
   const now = () => new Date().toISOString();
+  // A case needs staff attention while it is open and the customer spoke last.
+  const attention =
+    "c.status='open' AND c.user_id IS NOT NULL AND (SELECT n.author_id FROM support_notes n WHERE n.case_number=c.number AND n.visibility='public' ORDER BY n.id DESC LIMIT 1)=c.user_id";
   const log = (actor, action, type, id, reason = "") =>
     db
       .prepare(
@@ -192,6 +202,17 @@ export function registerSupportRoutes(app, db, entitlements) {
     if (!row) throw problem("Case not found.", 404);
     return row;
   };
+  app.get("/api/operator/cases/attention", (req, res) => {
+    res.json({
+      count: allows(req, "cases:manage")
+        ? db
+            .prepare(
+              `SELECT COUNT(*) n FROM support_cases c WHERE ${attention}`,
+            )
+            .get().n
+        : 0,
+    });
+  });
   app.get("/api/operator/cases", (req, res) => {
     need(req, "cases:manage");
     const q = z
@@ -215,7 +236,7 @@ export function registerSupportRoutes(app, db, entitlements) {
     res.json({
       rows: db
         .prepare(
-          `SELECT c.number,w.name AS workspace,c.workspace_id AS workspaceId,c.category,c.priority,c.status,c.subject,c.updated_at AS updatedAt,(SELECT name FROM users WHERE id=c.assigned_to) AS assignee FROM support_cases c JOIN workspaces w ON w.id=c.workspace_id WHERE ${where} ORDER BY CASE c.priority WHEN 'high' THEN 0 WHEN 'normal' THEN 1 ELSE 2 END,c.updated_at DESC LIMIT 25 OFFSET ?`,
+          `SELECT c.number,w.name AS workspace,c.workspace_id AS workspaceId,c.category,c.priority,c.status,c.subject,c.updated_at AS updatedAt,(${attention}) AS needsReply,(SELECT name FROM users WHERE id=c.assigned_to) AS assignee FROM support_cases c JOIN workspaces w ON w.id=c.workspace_id WHERE ${where} ORDER BY CASE c.priority WHEN 'high' THEN 0 WHEN 'normal' THEN 1 ELSE 2 END,c.updated_at DESC LIMIT 25 OFFSET ?`,
         )
         .all(...args, search, search, id, p * 25),
       total: db
@@ -369,14 +390,24 @@ export function registerSupportRoutes(app, db, entitlements) {
     legacyHeaders: false,
     message: { error: "Too many support requests. Try again later." },
   });
+  app.get("/api/support/unread", (req, res) => {
+    res.json({
+      count: db
+        .prepare(
+          "SELECT COUNT(*) n FROM support_cases c WHERE c.user_id=? AND EXISTS(SELECT 1 FROM support_notes n WHERE n.case_number=c.number AND n.visibility='public' AND n.author_id IS NOT ? AND n.created_at>COALESCE(c.customer_seen_at,''))",
+        )
+        .get(req.user.id, req.user.id).n,
+    });
+  });
   app.get("/api/support/requests", (req, res) => {
     if (!req.workspace) throw problem("Choose a workspace first.", 403);
     res.json(
       db
         .prepare(
-          "SELECT number,category,status,subject,updated_at AS updatedAt FROM support_cases WHERE user_id=? AND workspace_id=? ORDER BY updated_at DESC LIMIT 50",
+          "SELECT c.number,c.category,c.status,c.subject,c.updated_at AS updatedAt,EXISTS(SELECT 1 FROM support_notes n WHERE n.case_number=c.number AND n.visibility='public' AND n.author_id IS NOT ? AND n.created_at>COALESCE(c.customer_seen_at,'')) AS unread FROM support_cases c WHERE c.user_id=? AND c.workspace_id=? ORDER BY c.updated_at DESC LIMIT 50",
         )
-        .all(req.user.id, req.workspace.id),
+        .all(req.user.id, req.user.id, req.workspace.id)
+        .map((row) => ({ ...row, unread: !!row.unread })),
     );
   });
   app.post("/api/support/requests", requestLimit, (req, res) => {
@@ -416,9 +447,13 @@ export function registerSupportRoutes(app, db, entitlements) {
     res.status(201).json(mine(req, id));
   });
   app.get("/api/support/requests/:number", (req, res) => {
-    const id = number(req);
+    const id = number(req),
+      request = mine(req, id);
+    db.prepare(
+      "UPDATE support_cases SET customer_seen_at=? WHERE number=?",
+    ).run(now(), id);
     res.json({
-      ...mine(req, id),
+      ...request,
       replies: db
         .prepare(
           "SELECT n.id,n.body,n.created_at AS at,(n.author_id=?) AS you FROM support_notes n WHERE n.case_number=? AND n.visibility='public' ORDER BY n.id DESC LIMIT 100",
@@ -446,7 +481,7 @@ export function registerSupportRoutes(app, db, entitlements) {
           "INSERT INTO support_notes(case_number,author_id,body,created_at,visibility) VALUES (?,?,?,?,'public')",
         ).run(id, req.user.id, message, now());
         db.prepare(
-          "UPDATE support_cases SET updated_at=?,status=CASE WHEN status='resolved' THEN 'open' ELSE status END WHERE number=?",
+          "UPDATE support_cases SET updated_at=?,status=CASE WHEN status IN ('resolved','pending') THEN 'open' ELSE status END WHERE number=?",
         ).run(now(), id);
       });
       res.status(201).json({ ok: true });

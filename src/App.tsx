@@ -272,6 +272,31 @@ export default function App() {
   );
   const [settingsTab, setSettingsTab] = useState("team");
   const [settingsVisit, setSettingsVisit] = useState(0);
+  const [supportAlerts, setSupportAlerts] = useState({ staff: 0, mine: 0 });
+  useEffect(() => {
+    if (!auth?.user) return;
+    let active = true;
+    const load = () =>
+      Promise.all([
+        api<{ count: number }>("/support/unread"),
+        auth?.operator
+          ? api<{ count: number }>("/operator/cases/attention")
+          : Promise.resolve({ count: 0 }),
+      ])
+        .then(([mine, staff]) => {
+          if (active)
+            setSupportAlerts({ mine: mine.count, staff: staff.count });
+        })
+        .catch(() => {});
+    void load();
+    const timer = window.setInterval(load, 30000);
+    window.addEventListener("support-changed", load);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+      window.removeEventListener("support-changed", load);
+    };
+  }, [auth?.user, auth?.operator]);
   const [folder, setFolder] = useState("");
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("all");
@@ -752,7 +777,16 @@ export default function App() {
             >
               <ShieldCheck size={19} />
               <span>Control room</span>
-              <span className="nav-new">PLATFORM</span>
+              {supportAlerts.staff > 0 ? (
+                <span
+                  className="nav-alert"
+                  aria-label={`${supportAlerts.staff} support requests need a reply`}
+                >
+                  {supportAlerts.staff}
+                </span>
+              ) : (
+                <span className="nav-new">PLATFORM</span>
+              )}
             </button>
           )}
           <button
@@ -851,6 +885,14 @@ export default function App() {
           >
             <Settings size={18} />
             <span>Workspace settings</span>
+            {supportAlerts.mine > 0 && (
+              <span
+                className="nav-alert"
+                aria-label={`${supportAlerts.mine} new support replies`}
+              >
+                {supportAlerts.mine}
+              </span>
+            )}
           </button>
           {auth.workspace && (
             <button

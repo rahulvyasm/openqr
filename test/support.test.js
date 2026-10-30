@@ -318,3 +318,84 @@ test("customers file requests, see only their own and public replies, and cannot
   );
   assert.equal((await alice.call("/api/operator/cases")).status, 403);
 });
+
+test("support alerts count customer replies for staff and staff replies for customers", async (t) => {
+  const { setup, db, base } = await fixture(t);
+  await setup();
+  const owner = db.prepare("SELECT * FROM users").get();
+  const workspace = db.prepare("SELECT id FROM workspaces").get().id;
+  const headers = { origin: "http://localhost:5173" };
+  async function member(name, role) {
+    const id = randomUUID();
+    db.prepare(
+      "INSERT INTO users(id,email,name,salt,password) VALUES (?,?,?,?,?)",
+    ).run(id, `${name}@example.com`, name, owner.salt, owner.password);
+    db.prepare(
+      "INSERT INTO members(workspace_id,user_id,role,joined_at) VALUES (?,?,?,?)",
+    ).run(workspace, id, "viewer", new Date().toISOString());
+    if (role) setOperator(db, id, true, role);
+    const response = await fetch(base + "/api/auth/login", {
+      method: "POST",
+      headers: { ...headers, "content-type": "application/json" },
+      body: JSON.stringify({
+        email: `${name}@example.com`,
+        password: "a-secure-test-password",
+      }),
+    });
+    const cookie = response.headers.get("set-cookie").split(";")[0];
+    return {
+      call: (path, body, method) =>
+        fetch(base + path, {
+          method: method || (body ? "POST" : "GET"),
+          headers: {
+            ...headers,
+            cookie,
+            ...(body ? { "content-type": "application/json" } : {}),
+          },
+          body: body ? JSON.stringify(body) : undefined,
+        }),
+    };
+  }
+  const alice = await member("alice"),
+    support = await member("support", "support"),
+    analyst = await member("analyst", "analyst");
+  const count = async (who, path) =>
+    (await (await who.call(path)).json()).count;
+  const made = await alice.call("/api/support/requests", {
+    category: "other",
+    subject: "Help me",
+    message: "Need help.",
+  });
+  const { number } = await made.json();
+  assert.equal(await count(support, "/api/operator/cases/attention"), 1);
+  assert.equal(await count(analyst, "/api/operator/cases/attention"), 0);
+  assert.equal(await count(alice, "/api/support/unread"), 0);
+  // An internal note changes nothing; a public reply clears staff attention and notifies the customer.
+  await support.call(`/api/operator/cases/${number}/notes`, {
+    body: "Internal.",
+    visibility: "internal",
+  });
+  assert.equal(await count(alice, "/api/support/unread"), 0);
+  assert.equal(await count(support, "/api/operator/cases/attention"), 1);
+  await support.call(`/api/operator/cases/${number}/notes`, {
+    body: "On it.",
+    visibility: "public",
+  });
+  assert.equal(await count(support, "/api/operator/cases/attention"), 0);
+  assert.equal(await count(alice, "/api/support/unread"), 1);
+  assert.equal(
+    (await (await alice.call("/api/support/requests")).json())[0].unread,
+    true,
+  );
+  await alice.call(`/api/support/requests/${number}`);
+  assert.equal(await count(alice, "/api/support/unread"), 0);
+  await alice.call(`/api/support/requests/${number}/replies`, {
+    message: "Thanks, one more thing.",
+  });
+  assert.equal(await count(support, "/api/operator/cases/attention"), 1);
+  assert.equal(
+    (await (await support.call("/api/operator/cases")).json()).rows[0]
+      .needsReply,
+    1,
+  );
+});

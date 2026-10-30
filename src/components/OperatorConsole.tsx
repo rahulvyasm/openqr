@@ -129,6 +129,7 @@ export default function OperatorConsole({ userId }: { userId: string }) {
     [tableError, setTableError] = useState(""),
     [revoke, setRevoke] = useState<UserRow | null>(null),
     [customer, setCustomer] = useState<string | null>(null),
+    [waiting, setWaiting] = useState(0),
     [busy, setBusy] = useState(false),
     [actionError, setActionError] = useState(""),
     [message, setMessage] = useState("");
@@ -154,7 +155,11 @@ export default function OperatorConsole({ userId }: { userId: string }) {
       inFlight = true;
       try {
         const data = await api<Snapshot>("/operator/overview");
+        const cases = data.access.permissions.includes("cases:manage")
+          ? await api<{ count: number }>("/operator/cases/attention")
+          : { count: 0 };
         if (active) {
+          setWaiting(cases.count);
           setSnapshot(data);
           setError("");
         }
@@ -318,6 +323,9 @@ export default function OperatorConsole({ userId }: { userId: string }) {
             >
               <Icon size={15} />
               {label}
+              {id === "cases" && waiting > 0 && (
+                <span className="nav-alert">{waiting}</span>
+              )}
             </button>
           ))}
       </div>

@@ -2356,3 +2356,19 @@ dd {
     scroll-behavior: auto !important;
   }
 }
+
+.nav-alert {
+  background: #c2410c;
+  border-radius: 999px;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  margin-left: auto;
+  padding: 3px 7px;
+}
+.operator-tabs .nav-alert,
+.operator-table-wrap .nav-alert,
+.case-list .nav-alert {
+  margin-left: 0.4rem;
+}
