@@ -14,6 +14,7 @@
 - Add GitHub automation: CI with dependency audit and a Docker readiness check, CodeQL, Dependabot, and tag-driven releases that publish a container image.
 - Add Playwright visual regression tests (`npm run test:visual`) and a screenshot generator (`npm run docs:screenshots`).
 - Add the [runbook](docs/RUNBOOK.md), a postmortem template and a [production readiness checklist](docs/PRODUCTION_READINESS.md).
+- Fix a bug that made about 3% of codes impossible to edit: automatically generated short links could start with `-` or `_`, which the edit validation rejected. New links always start with a letter or digit, and existing links are accepted unchanged. This was also the cause of the intermittently failing tests.
 - Fix a motion-engine bug that stopped the landing page's tilt, magnetic buttons and spotlight from attaching when a page mounted in several steps.
 
 ## 0.5.0 — 2026-10-27

@@ -1,5 +1,5 @@
-import { randomBytes, randomUUID, createHash } from "node:crypto";
-import { audit } from "./security.js";
+import { randomUUID, createHash } from "node:crypto";
+import { audit, newSlug } from "./security.js";
 import { z } from "zod";
 import QRCode from "qrcode";
 import { zipSync, strToU8 } from "fflate";
@@ -167,7 +167,7 @@ export function registerCodeRoutes(
     entitlements?.assertCodeCreate(workspaceId);
     validateAssetReferences(db, c.data, workspaceId, c.type);
     const id = randomUUID(),
-      slug = c.slug || randomBytes(8).toString("base64url");
+      slug = c.slug || newSlug();
     if (db.prepare("SELECT id FROM codes WHERE slug=?").get(slug))
       throw invalid("That short link is already taken. Choose another.", 409);
     db.prepare(
@@ -384,7 +384,12 @@ export function registerCodeRoutes(
   app.put("/api/codes/:id", async (req, res) => {
     const old = getCode(req.params.id, req.workspace.id);
     if (!old) throw invalid("QR code not found.", 404);
-    const c = await validate(req.body, req.workspace.id);
+    // The slug is permanent; older codes may carry one the current rule rejects for new codes.
+    const body =
+      req.body?.slug === old.slug
+        ? { ...req.body, slug: undefined }
+        : req.body;
+    const c = await validate(body, req.workspace.id);
     if (c.type !== old.type || +c.dynamic !== old.dynamic)
       throw invalid("Code type cannot change after creation.");
     if (c.slug && c.slug !== old.slug)

@@ -2,6 +2,14 @@ import { createHash, randomBytes, scrypt, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
 const derive = promisify(scrypt);
 const modernOptions = { N: 32768, r: 8, p: 3, maxmem: 64 * 1024 * 1024 };
+// Short links must match the slug rule (letters or digits first), so a random
+// value that starts with "-" or "_" is skipped instead of being stored.
+export function newSlug() {
+  for (;;) {
+    const slug = randomBytes(8).toString("base64url");
+    if (/^[a-zA-Z0-9]/.test(slug)) return slug;
+  }
+}
 export const digest = (value) =>
   createHash("sha256").update(value).digest("hex");
 export const secret = () => randomBytes(32).toString("hex");

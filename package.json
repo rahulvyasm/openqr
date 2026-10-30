@@ -11,7 +11,7 @@
     "dev": "concurrently -k -n api,web \"node --watch server/index.js\" \"vite --host localhost\"",
     "build": "tsc --noEmit && vite build",
     "start": "node server/index.js",
-    "test": "node --test --test-concurrency=1 test/*.test.js",
+    "test": "node --test test/*.test.js",
     "test:recovery": "node --test test/recovery.test.js",
     "test:visual": "npm run build && playwright test",
     "docs:screenshots": "npm run build && playwright test -c playwright.docs.config.js",

@@ -1,6 +1,6 @@
-import { randomBytes, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { z } from "zod";
-import { audit, problem } from "./security.js";
+import { audit, newSlug, problem } from "./security.js";
 import { svgFor } from "./design.js";
 import { xml } from "../shared/qr.js";
 
@@ -168,7 +168,7 @@ export function registerItemRoutes(app, db, origin, entitlements) {
       const created = input.data.items.map((item) => {
         entitlements?.assertCodeCreate(req.workspace.id);
         const id = randomUUID(),
-          slug = randomBytes(8).toString("base64url");
+          slug = newSlug();
         db.prepare(
           "INSERT INTO codes (id,user_id,slug,name,type,dynamic,data,folder_id,color,active,created_at,design,campaign,workspace_id,page_options) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         ).run(
