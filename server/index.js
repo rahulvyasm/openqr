@@ -33,10 +33,15 @@ const { app, db, storage } = createApp({
   backupPolicy: { intervalHours: backupHours, retention },
   hosting: config.hosting,
   notifications: config.notifications,
+  logRequests: config.logRequests,
 });
 const server = app.listen(port, host, () =>
   console.log(`OpenQR API listening on http://localhost:${port}`),
 );
+// Bound slow and idle clients so they cannot hold connections open.
+server.requestTimeout = 120_000;
+server.headersTimeout = 30_000;
+server.keepAliveTimeout = 65_000;
 let backingUp = false;
 const responseCleanupTimer = setInterval(() => {
   try {
@@ -68,6 +73,8 @@ const backupTimer = backupHours
     }, backupHours * 3600000).unref()
   : null;
 function stop() {
+  // Give in-flight requests and any running backup time, then leave regardless.
+  setTimeout(() => process.exit(1), 25_000).unref();
   clearInterval(responseCleanupTimer);
   if (backupTimer) clearInterval(backupTimer);
   server.close(async () => {

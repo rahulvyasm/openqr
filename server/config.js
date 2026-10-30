@@ -35,9 +35,15 @@ function notificationsFromEnv(env) {
     throw new Error("SUPPORT_ALERT_EMAIL must list email addresses.");
   if (staffEmails.length && !smtpUrl)
     throw new Error("SUPPORT_ALERT_EMAIL requires SMTP_URL.");
+  const webhookSecret = env.SUPPORT_WEBHOOK_SECRET?.trim() || "";
+  if (webhookSecret && !webhookUrl)
+    throw new Error("SUPPORT_WEBHOOK_SECRET requires SUPPORT_WEBHOOK_URL.");
+  if (webhookSecret && webhookSecret.length < 16)
+    throw new Error("SUPPORT_WEBHOOK_SECRET must be at least 16 characters.");
   return {
     smtpUrl,
     webhookUrl,
+    webhookSecret,
     staffEmails,
     from: env.SMTP_FROM?.trim() || "",
   };
@@ -120,5 +126,6 @@ export function loadConfig(env = process.env) {
     },
     storageOptions: storageOptionsFromEnv(env),
     notifications: notificationsFromEnv(env),
+    logRequests: flag(env, "LOG_REQUESTS", production ? "true" : "false"),
   };
 }

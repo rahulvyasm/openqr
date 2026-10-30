@@ -6,11 +6,41 @@ A self-hosted, MIT-licensed QR workspace built with React, TypeScript, Express, 
 
 This is an independent implementation. It does not reuse QR Code Generator's code, branding, or assets, and is not affiliated with Bitly.
 
-![OpenQR dashboard](docs/dashboard.jpg)
+![OpenQR landing page](docs/landing.jpg)
 
-_Dashboard from a disposable test workspace. Your instance starts empty._
+## Try it in two minutes
 
-## What's included in v0.5
+```sh
+git clone https://github.com/rahulvyasm/openqr.git
+cd openqr
+docker compose up --build
+```
+
+Open <http://localhost:3001>, create the owner account, and make your first code. Set `PUBLIC_URL` to your permanent address **before printing any dynamic code** (see [Production](#production)). Without Docker: `npm ci`, then `npm run dev`.
+
+## What makes it different
+
+- **Codes you can edit after printing.** Dynamic codes keep their short link forever while the destination, page or experience behind them changes.
+- **Experiences, not just links.** Build a mobile page from blocks (text, images, video, files, buttons, forms), show different blocks at different times of day, collect responses, and see what visitors did next to scan counts. One experience can also serve hundreds of physical items, each with its own code, serial, warranty and service history.
+- **Yours.** MIT licensed, self-hosted, SQLite on your disk, no tracking scripts, no scan limits.
+- **Operated responsibly.** A separate company control room with role-limited staff, masked customer data, recorded reasons for sensitive actions, support cases, backups and restore drills. See the [production readiness checklist](docs/PRODUCTION_READINESS.md) and the [runbook](docs/RUNBOOK.md).
+
+| | |
+|---|---|
+| ![Dashboard](docs/dashboard.jpg) | ![Experience Studio](docs/studio.jpg) |
+| _Dashboard, from a disposable demo workspace. Your instance starts empty._ | _Experience Studio: blocks, time rules, draft and publish, with a live phone preview._ |
+| ![Designer](docs/designer.jpg) | ![Control room](docs/control-room.jpg) |
+| _The QR designer: frames, module shapes, finders, logos._ | _The company control room._ |
+| ![Experience on a phone](docs/experience-mobile.jpg) | ![Item page on a phone](docs/item-mobile.jpg) |
+| _A published experience on a phone._ | _An item page: the same template with this item's own serial, warranty and history._ |
+
+## Documentation
+
+- [Operations runbook](docs/RUNBOOK.md) and [postmortem template](docs/POSTMORTEM_TEMPLATE.md)
+- [Production readiness checklist](docs/PRODUCTION_READINESS.md)
+- [Roadmap](docs/ROADMAP.md), [changelog](CHANGELOG.md), [security policy](SECURITY.md), [contributing](CONTRIBUTING.md)
+
+## What's included
 
 ### Connection studio interface
 
@@ -48,11 +78,11 @@ and next scheduled launch using the workspace's actual scan and campaign data.
 - Image galleries with reordering and captions, audio/video players with seeking, hosted event pages with calendar downloads, and device-aware app-store routing with a web fallback. Reusable page templates share layout and styling across these pages.
 - Per-workspace storage quotas, bounded uploads, optional private S3-compatible media storage, and off-server backup copies.
 - Database + media snapshot backups, automatic retention, checksum validation, and offline restore with preservation of previous data.
-- SQLite persistence, self-hosted fonts/PDF resources, responsive layouts, Docker configuration, and GitHub Actions checks.
+- Experiences: block-based pages with forms, time rules, drafts and versions, per-item pages, tracked actions and email alerts (see [Experiences](#experiences)).
+- A company control room with role-limited staff access, customer support cases, a staff audit log, and optional hosted-mode plans (see [Company operator console](#company-operator-console)).
+- SQLite persistence, self-hosted fonts/PDF resources, a dark editorial interface with motion that respects reduced-motion preferences, responsive layouts, Docker with a health check, GitHub Actions (tests, audit, Docker, CodeQL), and Playwright visual regression tests.
 
 There is no third-party analytics SDK or external font service. No sample scans or prefilled campaigns are added to your workspace.
-
-![OpenQR advanced designer](docs/designer-v04.jpg)
 
 ## Upgrading from v0.1, v0.2, or v0.3
 
@@ -216,7 +246,6 @@ Files are workspace-private in the library. Attaching them to a published page i
 
 The server prevents deletion of files still referenced by a code. Replace/remove the file on every referencing page, then delete it from the library. Deleting a code leaves its library files available for reuse. Media lives on the server's persistent disk by default. Set `S3_BUCKET` (plus `S3_ENDPOINT`, `S3_REGION`, `S3_FORCE_PATH_STYLE` as needed) to store it privately in S3-compatible storage, and `S3_BACKUP_BUCKET` to copy backups off the server. Stop OpenQR and run `npm run storage:sync -- --confirm-stopped` to move existing local files (add `--prune-local` to remove verified local copies). `WORKSPACE_STORAGE_MB` (default 1024) and `MAX_UPLOAD_MB` (default 100, max 500) bound usage. Malware scanning is future work.
 
-![Mobile PDF landing page](docs/publishing-mobile.jpg)
 
 ## Backups and restore
 
@@ -426,7 +455,7 @@ Hosted storage limits replace the self-hosted `WORKSPACE_STORAGE_MB` quota;
 per-file upload limits still apply to every plan. Staff privileges and workspace
 plans are independent: a paid plan never grants company control-room access.
 
-v0.3 supports multiple workspaces and invited teams on a single self-hosted SQLite instance. The [competitive roadmap](docs/ROADMAP.md) covers custom domains, file/media pages, API keys, routing rules, automated backups, PostgreSQL-backed hosted operations, and further hardening. Billing and subscription limits are outside this self-hosted edition. A private GitHub repository stays private; the MIT license does not automatically publish its contents.
+OpenQR supports multiple workspaces and invited teams on a single self-hosted SQLite instance. The [roadmap](docs/ROADMAP.md) lists what is parked for later, including custom domains, API keys, payment collection for hosted plans, and PostgreSQL-backed hosted operations. See the [production readiness checklist](docs/PRODUCTION_READINESS.md) for what is and is not covered, and [SECURITY.md](SECURITY.md) before exposing an instance publicly.
 
 ## Open source
 

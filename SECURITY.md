@@ -1,6 +1,6 @@
 # Security
 
-OpenQR v0.4 is early software for invited teams on a trusted, self-hosted server. It implements workspace membership/role authorization, server-side sessions, and operator-managed recovery. It has not received an independent security audit. SSO, two-factor authentication, email-address verification/change flows, and public self-service signup are not implemented.
+OpenQR is early software for invited teams on a trusted, self-hosted server. It implements workspace membership/role authorization, server-side sessions, and operator-managed recovery. It has not received an independent security audit. SSO, two-factor authentication, email-address verification/change flows, and public self-service signup are not implemented.
 
 For a vulnerability, use GitHub's private vulnerability reporting feature on the repository where this project is published, if enabled. Do not disclose passwords, cookies, database files, or exploitable details in a public issue. Repository owners should enable private reporting before accepting public users.
 
@@ -23,3 +23,9 @@ Media uploads are limited to 20 MB and verified by file content. Images are re-e
 The private media API enforces live workspace roles. Public file access requires a 15-minute HMAC ticket tied to the publishing code and checks that the code still references the file and remains active/in its date window. Scan caps block new page visits, while a ticket from the last allowed visit may still retrieve its files. A token is a public publication capability, not an authentication session. Already loaded/downloaded content cannot be recalled.
 
 Backups include session credentials, password hashes, private QR content, and media. Store them outside publicly served directories, restrict filesystem permissions, and maintain an off-server copy. Restore is an operator-only, offline operation requiring --confirm-stopped. It rejects unsupported archive paths/types and validates database/media checksums and integrity before replacing data. Only restore trusted archives, keep the original PUBLIC_URL, and protect the preserved restore-history directories as carefully as the live database.
+
+Company staff access (the control room) is a separate permission set from workspace roles and is never granted by signup or invitations. Staff see masked contact details and usage, never QR content, page content or form responses. Revealing an email address, suspending an account and similar actions require a recorded reason and the actor's password, and are written to the staff audit log. Treat the company Super Admin account like production root access.
+
+Experience forms collect personal data from the public. Each form is rate limited, uses a honeypot and a short-lived ticket, and its responses are visible only inside the owning workspace, exportable and deletable by its members, and removed automatically after 365 days. Alert emails say only that a response arrived. Workspace owners are responsible for telling visitors what they collect. Outbound webhooks can be signed with HMAC-SHA256 (`SUPPORT_WEBHOOK_SECRET`); verify the signature and timestamp on the receiving side.
+
+Request logs are single JSON lines containing the method, route template, status and duration. They deliberately exclude query strings, identifiers, addresses and bodies. GitHub Actions run a high-severity dependency audit and CodeQL on every change. See [docs/PRODUCTION_READINESS.md](docs/PRODUCTION_READINESS.md) for the wider checklist and [docs/RUNBOOK.md](docs/RUNBOOK.md) for incident steps.

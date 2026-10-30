@@ -331,7 +331,7 @@ export default function Landing({
       <section className="l-hero">
         <div className="l-hero-copy">
           <span className="l-kicker l-fade">
-            <i /> OPEN SOURCE QR STUDIO / V0.5
+            <i /> OPEN SOURCE QR STUDIO / V0.6
           </span>
           <h1>
             <span className="l-line">

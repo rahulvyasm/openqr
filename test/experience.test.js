@@ -556,3 +556,49 @@ test("printable labels list every item's QR, name and serial", async (t) => {
   assert.equal((await request(`/api/codes/${parent.id}/experience/items/labels`, { authenticated: false })).status, 401);
 });
 
+
+test("a repeated submission is stored once and public routes are cached or limited sensibly", async (t) => {
+  const { request, setup, base } = await fixture(t);
+  await setup();
+  const code = await (await create(request)).json();
+  const page = await (await fetch(`${base}/r/${code.slug}`)).text();
+  const ticket = ticketOf(page);
+  for (let n = 0; n < 3; n++)
+    assert.match(
+      await (await post(base, `/r/${code.slug}/submit/form1`, { ticket, f_q1: "twice@example.com" })).text(),
+      /Thanks, we got it/,
+    );
+  assert.equal(
+    (await (await request(`/api/codes/${code.id}/experience/submissions`)).json()).length,
+    1,
+  );
+  // Different answers are still different responses.
+  await post(base, `/r/${code.slug}/submit/form1`, { ticket, f_q1: "other@example.com" });
+  assert.equal(
+    (await (await request(`/api/codes/${code.id}/experience/submissions`)).json()).length,
+    2,
+  );
+  // Public pages are never cached; the rate limit headers are present.
+  const res = await fetch(`${base}/r/${code.slug}`);
+  assert.equal(res.headers.get("cache-control"), "no-store");
+  assert.ok(res.headers.get("ratelimit") || res.headers.get("ratelimit-policy"));
+});
+
+test("request logs are one JSON line with route templates and no personal details", async (t) => {
+  const lines = [];
+  const original = console.log;
+  console.log = (line) => lines.push(String(line));
+  t.after(() => (console.log = original));
+  const { request, setup } = await fixture(t, ":memory:", { logRequests: true });
+  await setup();
+  const code = await (await create(request)).json();
+  await request(`/api/codes/${code.id}/experience/draft?secret=abc`);
+  console.log = original;
+  const entries = lines.filter((l) => l.startsWith("{")).map((l) => JSON.parse(l));
+  assert.ok(entries.length >= 3);
+  for (const entry of entries)
+    assert.deepEqual(Object.keys(entry).sort(), ["method", "ms", "route", "status", "t"]);
+  const draft = entries.find((e) => e.route.endsWith("/experience/draft"));
+  assert.equal(draft.route, "/api/codes/:id/experience/draft");
+  assert.doesNotMatch(lines.join("\n"), /secret=abc|owner@example\.com|a-secure-test-password/);
+});

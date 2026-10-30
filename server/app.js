@@ -39,6 +39,7 @@ export function createApp({
   hosting = {},
   notifications = {},
   notifier = null,
+  logRequests = false,
 } = {}) {
   const origin = new URL(publicUrl).origin;
   if (!dbPath) {
@@ -106,6 +107,34 @@ export function createApp({
           upgradeInsecureRequests: null,
         },
       },
+    }),
+  );
+  if (logRequests)
+    // One JSON line per request. Route templates only: no query strings, IDs, addresses or bodies.
+    app.use((req, res, next) => {
+      const started = process.hrtime.bigint();
+      res.on("finish", () =>
+        console.log(
+          JSON.stringify({
+            t: new Date().toISOString(),
+            method: req.method,
+            route: req.route ? `${req.baseUrl}${req.route.path}` : req.baseUrl || "unmatched",
+            status: res.statusCode,
+            ms: Math.round(Number(process.hrtime.bigint() - started) / 1e6),
+          }),
+        ),
+      );
+      next();
+    });
+  // Scans and public pages are anonymous, so each address gets a generous ceiling.
+  app.use(
+    "/r",
+    rateLimit({
+      windowMs: 60_000,
+      limit: 600,
+      standardHeaders: "draft-8",
+      legacyHeaders: false,
+      message: "Too many requests. Please wait a moment.",
     }),
   );
   app.use(express.json({ limit: "2mb" }));
@@ -248,9 +277,20 @@ export function createApp({
   app.use("/api", (_req, res) =>
     res.status(404).json({ error: "Endpoint not found." }),
   );
-  app.use(express.static(resolve("dist")));
+  app.use(
+    express.static(resolve("dist"), {
+      setHeaders: (res, file) =>
+        res.setHeader(
+          "Cache-Control",
+          // Build output is content-hashed, so it can be cached forever; the shell must revalidate.
+          /[\\/]assets[\\/]/.test(file)
+            ? "public, max-age=31536000, immutable"
+            : "no-cache",
+        ),
+    }),
+  );
   app.get("/{*path}", (_req, res, next) =>
-    res.sendFile(resolve("dist/index.html"), (err) => {
+    res.set("Cache-Control", "no-cache").sendFile(resolve("dist/index.html"), (err) => {
       if (err) next(err);
     }),
   );

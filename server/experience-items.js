@@ -14,6 +14,7 @@ export function migrateItems(db) {
   db.exec(`
     CREATE TABLE IF NOT EXISTS experience_service (id INTEGER PRIMARY KEY, code_id TEXT NOT NULL REFERENCES codes(id) ON DELETE CASCADE, service_date TEXT NOT NULL, note TEXT NOT NULL, created_at TEXT NOT NULL);
     CREATE INDEX IF NOT EXISTS experience_service_code ON experience_service(code_id, service_date);
+    CREATE INDEX IF NOT EXISTS codes_item_of ON codes(json_extract(data,'$.itemOf')) WHERE type='experience';
   `);
 }
 

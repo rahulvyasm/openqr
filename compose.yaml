@@ -11,8 +11,15 @@ services:
       BACKUP_RETENTION: ${BACKUP_RETENTION:-7}
       HOSTED_MODE: ${HOSTED_MODE:-false}
       HOSTED_MAX_OWNED_WORKSPACES: ${HOSTED_MAX_OWNED_WORKSPACES:-3}
+      LOG_REQUESTS: ${LOG_REQUESTS:-true}
+      SMTP_URL: ${SMTP_URL:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      SUPPORT_ALERT_EMAIL: ${SUPPORT_ALERT_EMAIL:-}
+      SUPPORT_WEBHOOK_URL: ${SUPPORT_WEBHOOK_URL:-}
+      SUPPORT_WEBHOOK_SECRET: ${SUPPORT_WEBHOOK_SECRET:-}
     volumes:
       - openqr-data:/app/data
     restart: unless-stopped
+    stop_grace_period: 30s
 volumes:
   openqr-data:

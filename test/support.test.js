@@ -487,12 +487,12 @@ test("the notifier sends bare-bones messages and survives delivery failures", as
   };
   try {
     const notifier = createNotifier(
-      { webhookUrl: "https://hooks.example/x" },
+      { webhookUrl: "https://hooks.example/x", retryDelayMs: 1 },
       "https://qr.example",
     );
     assert.equal(notifier.enabled, true);
     await notifier.staffAlert("new", 7, "Acme");
-    assert.equal(calls.length, 1);
+    assert.equal(calls.length, 3); // network failures are retried, then given up
     assert.match(
       calls[0][1],
       /SUP-7 \(Acme\).*https:\/\/qr\.example\/control-room/,
@@ -512,4 +512,46 @@ test("the notifier sends bare-bones messages and survives delivery failures", as
     () => loadConfig({ ...base, SUPPORT_ALERT_EMAIL: "a@example.com" }),
     /requires SMTP_URL/,
   );
+});
+
+test("webhooks are signed, retried on server errors and not retried on client errors", async () => {
+  const { createNotifier } = await import("../server/notify.js");
+  const { createHmac } = await import("node:crypto");
+  const original = globalThis.fetch;
+  const seen = [];
+  let statuses = [503, 200];
+  globalThis.fetch = async (_url, init) => {
+    seen.push(init);
+    const status = statuses.shift() ?? 200;
+    return { ok: status < 400, status };
+  };
+  try {
+    const secret = "a-long-shared-secret";
+    const notifier = createNotifier(
+      { webhookUrl: "https://hooks.example/x", webhookSecret: secret, retryDelayMs: 1 },
+      "https://qr.example",
+    );
+    await notifier.staffAlert("new", 9, "Acme");
+    assert.equal(seen.length, 2); // 503 then success
+    const { headers, body } = seen[1];
+    const expected = createHmac("sha256", secret)
+      .update(`${headers["x-openqr-timestamp"]}.${body}`)
+      .digest("hex");
+    assert.equal(headers["x-openqr-signature"], `sha256=${expected}`);
+    seen.length = 0;
+    statuses = [400, 200];
+    await notifier.staffAlert("new", 10, "Acme");
+    assert.equal(seen.length, 1); // rejected requests are not retried
+  } finally {
+    globalThis.fetch = original;
+  }
+  const { loadConfig } = await import("../server/config.js");
+  const base = { PUBLIC_URL: "http://localhost:5173" };
+  assert.throws(() => loadConfig({ ...base, SUPPORT_WEBHOOK_SECRET: "x".repeat(20) }), /SUPPORT_WEBHOOK_URL/);
+  assert.throws(
+    () => loadConfig({ ...base, SUPPORT_WEBHOOK_URL: "https://h.example", SUPPORT_WEBHOOK_SECRET: "short" }),
+    /16 characters/,
+  );
+  assert.equal(loadConfig({ ...base }).logRequests, false);
+  assert.equal(loadConfig({ ...base, LOG_REQUESTS: "true" }).logRequests, true);
 });

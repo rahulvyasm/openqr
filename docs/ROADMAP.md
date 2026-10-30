@@ -107,7 +107,7 @@ The supplied QRCG screens also show coupons, feedback/ratings, and GS1 2D barcod
 
 - Verify real SMTP delivery of staff and customer support alerts with a test inbox.
 - Online payment collection (needs final INR prices and a payment provider such as Razorpay).
-- Track down intermittently failing media and publishing tests.
+- Find why some tests fail intermittently when test files run in parallel (they pass one file at a time, so `npm test` now runs serially). Suspect timing or CPU contention between test processes, not application behavior.
 - Support gaps: file or screenshot attachments on requests, merging duplicate cases, and reply-time targets.
 
 ## Parked for later (experiences)

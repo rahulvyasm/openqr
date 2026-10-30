@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.6.0 — 2026-10-30
+
+- Add **Experiences**: hosted pages built from blocks (heading, text, image, video, button, links, file, form, item details). Draft, publish and restore with up to 50 kept versions; a live phone preview; four starters (product companion, event welcome, business enquiry, guest feedback).
+- Forms collect responses without scripts: ticketed posts, a honeypot, per-address rate limits, duplicate suppression, CSV export that neutralises spreadsheet formulas, deletion, automatic expiry after 365 days, and optional email alerts that never include answers.
+- Track what visitors do: buttons and links use a tracked redirect, and Results shows scans next to taps, submissions and actions per scan.
+- Add time rules: show a block only on chosen days or between times in the page's time zone (overnight ranges work), with a "Preview as" control.
+- Add **item pages**: one experience as a template for many physical items, each with its own code, serial, warranty and service history; CSV import (up to 1,000), a printable label sheet, a Report-a-problem shortcut and an automatic serial form field. Responses and results roll up into the template.
+- Add the company **control room**: role-limited staff access (Super Admin, Operations, Support, Billing, Analyst) separate from customer workspace roles, masked customer views, password re-confirmation and recorded reasons for sensitive actions, account suspension, a staff audit log, and optional hosted-mode plans with INR display prices.
+- Add customer **support cases** with in-app alerts for customers and staff, optional email and webhook alerts, and a notes visibility model. Webhooks can be signed (`SUPPORT_WEBHOOK_SECRET`) and alert delivery retries with backoff.
+- Redesign the interface as a dark editorial studio with a new landing page and GSAP motion that respects reduced-motion preferences.
+- Harden operations: one JSON line per request with route templates only (`LOG_REQUESTS`), public-page rate limiting, request and header timeouts, forced exit after a stalled shutdown, long-lived caching for hashed build assets, a Docker `HEALTHCHECK`, and an expression index for item pages.
+- Add GitHub automation: CI with dependency audit and a Docker readiness check, CodeQL, Dependabot, and tag-driven releases that publish a container image.
+- Add Playwright visual regression tests (`npm run test:visual`) and a screenshot generator (`npm run docs:screenshots`).
+- Add the [runbook](docs/RUNBOOK.md), a postmortem template and a [production readiness checklist](docs/PRODUCTION_READINESS.md).
+- Fix a motion-engine bug that stopped the landing page's tilt, magnetic buttons and spotlight from attaching when a page mounted in several steps.
+
 ## 0.5.0 — 2026-10-27
 
 - Add image gallery pages (1–24 images) with drag/arrow reordering, captions, alternative text, optional downloads, and a mobile photo grid or full-width layout.

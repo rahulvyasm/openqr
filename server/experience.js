@@ -530,6 +530,21 @@ export function registerExperienceRoutes(
         });
       const now = new Date();
       purgeExpiredResponses(db, now);
+      // A double tap or a retry must not store the same response twice.
+      const answersJson = JSON.stringify(result.answers);
+      if (
+        db
+          .prepare(
+            "SELECT 1 FROM experience_submissions WHERE code_id=? AND block_id=? AND answers=? AND created_at>?",
+          )
+          .get(
+            row.id,
+            block.id,
+            answersJson,
+            new Date(Date.now() - 60_000).toISOString(),
+          )
+      )
+        return page({ sent: block.id });
       const total = db
         .prepare("SELECT COUNT(*) n FROM experience_submissions WHERE code_id=?")
         .get(row.id).n;

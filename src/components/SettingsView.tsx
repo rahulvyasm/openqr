@@ -75,7 +75,7 @@ export default function SettingsView({
     <>
       <div className="page-heading">
         <div>
-          <span className="eyebrow">CONTROL ROOM</span>
+          <span className="eyebrow">WORKSPACE SETTINGS</span>
           <h1>
             Your studio. Your rules<span>.</span>
           </h1>

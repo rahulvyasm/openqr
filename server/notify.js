@@ -1,33 +1,65 @@
+import { createHmac } from "node:crypto";
 import nodemailer from "nodemailer";
 
 // Optional outbound support alerts. Messages never include request text: they only say
 // that something needs attention, so private details stay inside the signed-in app.
 export function createNotifier(options = {}, publicUrl = "") {
-  const { smtpUrl, from, staffEmails = [], webhookUrl } = options;
+  const {
+    smtpUrl,
+    from,
+    staffEmails = [],
+    webhookUrl,
+    webhookSecret = "",
+    retryDelayMs = 500,
+    attempts = 3,
+  } = options;
   const mailer = smtpUrl ? nodemailer.createTransport(smtpUrl) : null;
   const sender = from || "OpenQR <no-reply@localhost>";
   const warn = (what, error) =>
     console.warn(
       `Support notification (${what}) failed: ${error?.code || error?.name || "error"}`,
     );
+  // Delivery is retried with exponential backoff and jitter; the last failure is logged.
+  const retry = async (what, job) => {
+    for (let attempt = 1; ; attempt++) {
+      try {
+        return await job();
+      } catch (error) {
+        if (attempt >= attempts || error?.permanent) return warn(what, error);
+        const wait = retryDelayMs * 2 ** (attempt - 1);
+        await new Promise((r) => setTimeout(r, wait + Math.random() * wait * 0.25));
+      }
+    }
+  };
   const mail = (to, subject, text) =>
     mailer
-      ? mailer
-          .sendMail({ from: sender, to, subject, text })
-          .catch((e) => warn("email", e))
+      ? retry("email", () => mailer.sendMail({ from: sender, to, subject, text }))
       : Promise.resolve();
   const hook = (text) =>
     webhookUrl
-      ? fetch(webhookUrl, {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ text }),
-          signal: AbortSignal.timeout(5000),
+      ? retry("webhook", async () => {
+          const body = JSON.stringify({ text }),
+            timestamp = String(Math.floor(Date.now() / 1000));
+          const res = await fetch(webhookUrl, {
+            method: "POST",
+            headers: {
+              "content-type": "application/json",
+              ...(webhookSecret
+                ? {
+                    "x-openqr-timestamp": timestamp,
+                    // Receivers verify HMAC-SHA256 of `${timestamp}.${body}`.
+                    "x-openqr-signature": `sha256=${createHmac("sha256", webhookSecret).update(`${timestamp}.${body}`).digest("hex")}`,
+                  }
+                : {}),
+            },
+            body,
+            signal: AbortSignal.timeout(5000),
+          });
+          // A client error will not improve on retry; a server error might.
+          if (res.status >= 400 && res.status < 500)
+            throw Object.assign(new Error("rejected"), { code: res.status, permanent: true });
+          if (!res.ok) throw Object.assign(new Error("failed"), { code: res.status });
         })
-          .then((res) => {
-            if (!res.ok) warn("webhook", { code: res.status });
-          })
-          .catch((e) => warn("webhook", e))
       : Promise.resolve();
   return {
     enabled: !!(mailer || webhookUrl),
