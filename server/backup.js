@@ -16,6 +16,7 @@ import {
 } from "node:fs/promises";
 import { resolve, join, dirname, parse } from "node:path";
 import * as tar from "tar";
+import { readBackupStatus, writeBackupStatus } from "./backup-status.js";
 
 async function checksum(path) {
   const hash = createHash("sha256");
@@ -52,10 +53,19 @@ export async function createBackup({
   const folder = resolve(directory);
   await mkdir(folder, { recursive: true });
   return storage.exclusive(async () => {
-    const stage = await mkdtemp(join(folder, ".openqr-backup-")),
-      name = `openqr-${new Date().toISOString().replace(/[:.]/g, "-")}-${randomUUID().slice(0, 8)}.tar.gz`,
+    const status = {
+      ...(await readBackupStatus(folder)),
+      state: "running",
+      lastAttemptAt: new Date().toISOString(),
+      failureStage: null,
+    };
+    await writeBackupStatus(folder, status);
+    let stage,
+      phase = "snapshot";
+    const name = `openqr-${new Date().toISOString().replace(/[:.]/g, "-")}-${randomUUID().slice(0, 8)}.tar.gz`,
       archive = join(folder, name);
     try {
+      stage = await mkdtemp(join(folder, ".openqr-backup-"));
       await mkdir(join(stage, "media"));
       await backup(db, join(stage, "openqr.sqlite"));
       const snapshot = new DatabaseSync(join(stage, "openqr.sqlite"), {
@@ -97,13 +107,17 @@ export async function createBackup({
         ["openqr.sqlite", "manifest.json", "media"],
       );
       await rename(archive + ".partial", archive);
+      status.localCompletedAt = new Date().toISOString();
+      await writeBackupStatus(folder, status);
       const archives = (await readdir(folder))
         .filter((n) => /^openqr-\d{4}-.*\.tar\.gz$/.test(n))
         .sort()
         .reverse();
       for (const old of archives.slice(Math.max(1, retention)))
         await unlink(join(folder, old));
-      if(storage.backupStore)await storage.backupStore.uploadArchive(archive,name);
+      phase = "remote";
+      if (storage.backupStore)
+        await storage.backupStore.uploadArchive(archive, name);
       else if (storage.backupBucket && storage.objectStore)
         await storage.objectStore.uploadArchive(
           archive,
@@ -111,10 +125,21 @@ export async function createBackup({
           storage.backupBucket,
           storage.backupPrefix || "openqr/backups/",
         );
+      if (storage.backupStore || (storage.backupBucket && storage.objectStore))
+        status.remoteCompletedAt = new Date().toISOString();
+      status.state = "succeeded";
+      status.lastSuccessAt = new Date().toISOString();
+      await writeBackupStatus(folder, status);
       return archive;
+    } catch (error) {
+      status.state = "failed";
+      status.lastFailureAt = new Date().toISOString();
+      status.failureStage = phase;
+      await writeBackupStatus(folder, status).catch(() => {});
+      throw error;
     } finally {
       await unlink(archive + ".partial").catch(() => {});
-      await removeStage(stage, folder);
+      if (stage) await removeStage(stage, folder);
     }
   });
 }

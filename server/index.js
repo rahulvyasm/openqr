@@ -3,33 +3,37 @@ import { mkdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { createApp } from "./app.js";
 import { createBackup } from "./backup.js";
-import { storageOptionsFromEnv } from "./object-store.js";
-const port = Number(process.env.PORT || 3001);
-const dataDir = resolve(process.env.DATA_DIR || "data");
+import { loadConfig } from "./config.js";
+let config;
+try {
+  config = loadConfig();
+} catch (error) {
+  console.error(`OpenQR configuration error: ${error.message}`);
+  process.exit(1);
+}
+const {
+  port,
+  host,
+  dataDir,
+  publicUrl,
+  secureCookie,
+  trustProxy,
+  storageOptions,
+  backupHours,
+  retention,
+} = config;
 mkdirSync(dataDir, { recursive: true });
 const { app, db, storage } = createApp({
   dbPath: resolve(dataDir, "openqr.sqlite"),
-  publicUrl: process.env.PUBLIC_URL || "http://localhost:5173",
-  secureCookie: process.env.COOKIE_SECURE === "true",
-  trustProxy: process.env.TRUST_PROXY === "1",
-  storageOptions: storageOptionsFromEnv(),
+  publicUrl,
+  secureCookie,
+  trustProxy,
+  storageOptions,
+  backupPolicy: { intervalHours: backupHours, retention },
 });
-const host =
-  process.env.HOST ||
-  (process.env.NODE_ENV === "production" ? "0.0.0.0" : "127.0.0.1");
 const server = app.listen(port, host, () =>
   console.log(`OpenQR API listening on http://localhost:${port}`),
 );
-const backupHours = Number(process.env.BACKUP_INTERVAL_HOURS ?? 24);
-const retention = Number(process.env.BACKUP_RETENTION ?? 7);
-if (
-  !Number.isFinite(backupHours) ||
-  backupHours < 0 ||
-  backupHours > 24 * 24 ||
-  !Number.isInteger(retention) ||
-  retention < 1
-)
-  throw new Error("Use a valid backup interval and positive retention count.");
 let backingUp = false;
 let backupInFlight;
 const backupTimer = backupHours
@@ -41,7 +45,7 @@ const backupTimer = backupHours
           db,
           storage,
           directory: resolve(dataDir, "backups"),
-          publicUrl: process.env.PUBLIC_URL || "http://localhost:5173",
+          publicUrl,
           retention,
         });
         await backupInFlight;

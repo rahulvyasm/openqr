@@ -10,7 +10,8 @@ import { migrateCodes, registerCodeRoutes } from "./codes.js";
 
 import { migrateWorkspaces, registerWorkspaceRoutes } from "./workspaces.js";
 import { registerAuth } from "./auth.js";
-import { access, problem } from "./security.js";
+import { access, problem, canManage } from "./security.js";
+import { readBackupStatus } from "./backup-status.js";
 import {
   createStorage,
   migratePublishing,
@@ -25,6 +26,7 @@ export function createApp({
   trustProxy = false,
   storageDir,
   storageOptions = {},
+  backupPolicy = null,
 } = {}) {
   const origin = new URL(publicUrl).origin;
   if (!dbPath) {
@@ -160,6 +162,24 @@ export function createApp({
     next();
   });
   registerAssetRoutes(app, db, storage);
+  app.get("/api/backups/status", async (req, res) => {
+    if (!canManage(req.workspace.role))
+      throw problem(
+        "Only workspace owners and admins can view backup status.",
+        403,
+      );
+    const directory =
+      dbPath === ":memory:" ? null : join(dirname(resolve(dbPath)), "backups");
+    res.json({
+      ...(await readBackupStatus(directory)),
+      intervalHours: backupPolicy?.intervalHours ?? null,
+      retention: backupPolicy?.retention ?? null,
+      remoteEnabled: !!(
+        storage.backupStore ||
+        (storage.backupBucket && storage.objectStore)
+      ),
+    });
+  });
   registerCodeRoutes(app, db, origin, analyticsSalt, storage);
   app.get("/api/folders", (req, res) =>
     res.json(

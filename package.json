@@ -12,6 +12,7 @@
     "build": "tsc --noEmit && vite build",
     "start": "node server/index.js",
     "test": "node --test test/*.test.js",
+    "test:recovery": "node --test test/recovery.test.js",
     "format": "prettier --write src server shared scripts test *.json *.ts *.md *.yaml .github/workflows/*.yml",
     "recover": "node server/manage.js",
     "backup": "node server/backup-cli.js backup",
