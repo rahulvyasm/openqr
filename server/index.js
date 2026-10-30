@@ -31,6 +31,7 @@ const { app, db, storage } = createApp({
   storageOptions,
   backupPolicy: { intervalHours: backupHours, retention },
   hosting: config.hosting,
+  notifications: config.notifications,
 });
 const server = app.listen(port, host, () =>
   console.log(`OpenQR API listening on http://localhost:${port}`),

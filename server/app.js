@@ -14,6 +14,7 @@ import { access, problem, canManage } from "./security.js";
 import { readBackupStatus } from "./backup-status.js";
 import { registerOperatorRoutes } from "./operator.js";
 import { registerSupportRoutes } from "./support.js";
+import { createNotifier } from "./notify.js";
 import {
   createEntitlements,
   registerPlanRoutes,
@@ -35,6 +36,8 @@ export function createApp({
   storageOptions = {},
   backupPolicy = null,
   hosting = {},
+  notifications = {},
+  notifier = null,
 } = {}) {
   const origin = new URL(publicUrl).origin;
   if (!dbPath) {
@@ -146,7 +149,12 @@ export function createApp({
     backupPolicy,
   });
   registerPlanAdminRoutes(app, db, entitlements);
-  registerSupportRoutes(app, db, entitlements);
+  registerSupportRoutes(
+    app,
+    db,
+    entitlements,
+    notifier || createNotifier(notifications, origin),
+  );
   registerWorkspaceRoutes(app, db, origin, entitlements);
   app.use("/api", (req, _res, next) => {
     if (!req.workspace)

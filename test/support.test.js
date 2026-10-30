@@ -399,3 +399,117 @@ test("support alerts count customer replies for staff and staff replies for cust
     1,
   );
 });
+
+test("outbound support alerts omit request text, skip internal notes, and never block requests", async (t) => {
+  const sent = [];
+  const notifier = {
+    customerReply: async (email, number) =>
+      sent.push(["customer", email, number]),
+    staffAlert: async (kind, number, workspace) =>
+      sent.push(["staff", kind, number, workspace]),
+  };
+  const { setup, db, base } = await fixture(t, ":memory:", { notifier });
+  await setup();
+  const owner = db.prepare("SELECT * FROM users").get();
+  const workspace = db.prepare("SELECT id FROM workspaces").get().id;
+  const headers = { origin: "http://localhost:5173" };
+  async function member(name, role) {
+    const id = randomUUID();
+    db.prepare(
+      "INSERT INTO users(id,email,name,salt,password) VALUES (?,?,?,?,?)",
+    ).run(id, `${name}@example.com`, name, owner.salt, owner.password);
+    db.prepare(
+      "INSERT INTO members(workspace_id,user_id,role,joined_at) VALUES (?,?,?,?)",
+    ).run(workspace, id, "viewer", new Date().toISOString());
+    if (role) setOperator(db, id, true, role);
+    const response = await fetch(base + "/api/auth/login", {
+      method: "POST",
+      headers: { ...headers, "content-type": "application/json" },
+      body: JSON.stringify({
+        email: `${name}@example.com`,
+        password: "a-secure-test-password",
+      }),
+    });
+    const cookie = response.headers.get("set-cookie").split(";")[0];
+    return {
+      call: (path, body, method) =>
+        fetch(base + path, {
+          method: method || (body ? "POST" : "GET"),
+          headers: {
+            ...headers,
+            cookie,
+            ...(body ? { "content-type": "application/json" } : {}),
+          },
+          body: body ? JSON.stringify(body) : undefined,
+        }),
+    };
+  }
+  const alice = await member("alice"),
+    support = await member("support", "support");
+  const { number } = await (
+    await alice.call("/api/support/requests", {
+      category: "other",
+      subject: "Help",
+      message: "Secret details",
+    })
+  ).json();
+  assert.deepEqual(sent.splice(0), [
+    [
+      "staff",
+      "new",
+      number,
+      db.prepare("SELECT name FROM workspaces").get().name,
+    ],
+  ]);
+  await support.call(`/api/operator/cases/${number}/notes`, {
+    body: "Internal",
+    visibility: "internal",
+  });
+  assert.deepEqual(sent, []);
+  await support.call(`/api/operator/cases/${number}/notes`, {
+    body: "Public",
+    visibility: "public",
+  });
+  assert.deepEqual(sent.splice(0), [["customer", "alice@example.com", number]]);
+  await alice.call(`/api/support/requests/${number}/replies`, {
+    message: "More",
+  });
+  assert.equal(sent.splice(0)[0][1], "reply");
+});
+
+test("the notifier sends bare-bones messages and survives delivery failures", async () => {
+  const { createNotifier } = await import("../server/notify.js");
+  const calls = [];
+  const original = globalThis.fetch;
+  globalThis.fetch = async (url, init) => {
+    calls.push([url, JSON.parse(init.body).text]);
+    throw new Error("network down");
+  };
+  try {
+    const notifier = createNotifier(
+      { webhookUrl: "https://hooks.example/x" },
+      "https://qr.example",
+    );
+    assert.equal(notifier.enabled, true);
+    await notifier.staffAlert("new", 7, "Acme");
+    assert.equal(calls.length, 1);
+    assert.match(
+      calls[0][1],
+      /SUP-7 \(Acme\).*https:\/\/qr\.example\/control-room/,
+    );
+    await notifier.customerReply("a@example.com", 7);
+    assert.equal(createNotifier({}, "").enabled, false);
+  } finally {
+    globalThis.fetch = original;
+  }
+  const { loadConfig } = await import("../server/config.js");
+  const base = { PUBLIC_URL: "http://localhost:5173" };
+  assert.throws(
+    () => loadConfig({ ...base, SMTP_URL: "http://x" }),
+    /SMTP_URL/,
+  );
+  assert.throws(
+    () => loadConfig({ ...base, SUPPORT_ALERT_EMAIL: "a@example.com" }),
+    /requires SMTP_URL/,
+  );
+});

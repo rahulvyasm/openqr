@@ -15,7 +15,7 @@ import { tmpdir, hostname } from "node:os";
 import sharp from "sharp";
 import { PDFDocument } from "pdf-lib";
 import { problem, audit } from "./security.js";
-import {constants} from 'node:fs';
+import { constants } from "node:fs";
 import { inspectMedia } from "./media.js";
 import { parseGallery } from "./collections.js";
 
@@ -187,7 +187,7 @@ export function createStorage(
     },
     async ready() {
       await mkdir(mediaDir, { recursive: true });
-      await access(mediaDir,constants.W_OK);
+      await access(mediaDir, constants.W_OK);
       if (objectStore) await objectStore.ready();
     },
     async dispose() {
@@ -239,9 +239,10 @@ export function validateAssetReferences(db, data, workspaceId, type) {
         throw problem("Choose gallery images from this workspace.");
     }
 }
-export function registerAssetRoutes(app, db, storage,entitlements) {
-  const workspaceQuota = workspaceId => entitlements?.quota(workspaceId) ?? storage.quota;
-  let uploads=0;
+export function registerAssetRoutes(app, db, storage, entitlements) {
+  const workspaceQuota = (workspaceId) =>
+    entitlements?.quota(workspaceId) ?? storage.quota;
+  let uploads = 0;
   app.get("/api/storage", (req, res) =>
     res.json({
       usedBytes: db
@@ -266,7 +267,26 @@ export function registerAssetRoutes(app, db, storage,entitlements) {
   );
   app.post(
     "/api/assets",
-    (req,res,next)=>{if(uploads>=2)return res.status(429).json({error:'Two uploads are already being processed. Try again shortly.'});uploads++;let released=false;const release=()=>{if(!released){released=true;uploads--;}};res.once('finish',release);res.once('close',release);next();},
+    (req, res, next) => {
+      if (uploads >= 2)
+        return res
+          .status(429)
+          .json({
+            error:
+              "Two uploads are already being processed. Try again shortly.",
+          });
+      uploads++;
+      let released = false;
+      const release = () => {
+        if (!released) {
+          released = true;
+          uploads--;
+        }
+      };
+      res.once("finish", release);
+      res.once("close", release);
+      next();
+    },
     express.raw({ type: () => true, limit: storage.maxUpload }),
     async (req, res) => {
       if (!Buffer.isBuffer(req.body) || !req.body.length)
@@ -350,7 +370,7 @@ export function registerAssetRoutes(app, db, storage,entitlements) {
         key = `${id}.${extension || (kind === "pdf" ? "pdf" : mime === "image/png" ? "png" : "jpg")}`,
         hash = createHash("sha256").update(bytes).digest("hex");
       await storage.exclusive(async () => {
-        if(req.aborted||res.destroyed)throw problem('Upload cancelled.');
+        if (req.aborted || res.destroyed) throw problem("Upload cancelled.");
         req.assertEdit();
         const used = db
           .prepare(
@@ -363,13 +383,19 @@ export function registerAssetRoutes(app, db, storage,entitlements) {
             413,
           );
         await storage.put(key, bytes, mime);
-        let inserting=false;
+        let inserting = false;
         try {
-          if(req.aborted||res.destroyed)throw problem('Upload cancelled.');
+          if (req.aborted || res.destroyed) throw problem("Upload cancelled.");
           req.assertEdit();
-          db.exec('BEGIN IMMEDIATE');inserting=true;
-          const currentUsed=db.prepare('SELECT COALESCE(SUM(size),0) total FROM assets WHERE workspace_id=?').get(req.workspace.id).total;
-          if(currentUsed+bytes.length>workspaceQuota(req.workspace.id))throw problem('This workspace has reached its storage limit.',413);
+          db.exec("BEGIN IMMEDIATE");
+          inserting = true;
+          const currentUsed = db
+            .prepare(
+              "SELECT COALESCE(SUM(size),0) total FROM assets WHERE workspace_id=?",
+            )
+            .get(req.workspace.id).total;
+          if (currentUsed + bytes.length > workspaceQuota(req.workspace.id))
+            throw problem("This workspace has reached its storage limit.", 413);
           db.prepare(
             "INSERT INTO assets (id,workspace_id,user_id,name,kind,mime,size,storage_key,sha256,pages,created_at,metadata) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
           ).run(
@@ -390,9 +416,10 @@ export function registerAssetRoutes(app, db, storage,entitlements) {
             name,
             kind,
           });
-          db.exec('COMMIT');inserting=false;
+          db.exec("COMMIT");
+          inserting = false;
         } catch (e) {
-          if(inserting)db.exec('ROLLBACK');
+          if (inserting) db.exec("ROLLBACK");
           await storage.remove(key);
           throw e;
         }

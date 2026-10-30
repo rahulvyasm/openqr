@@ -101,6 +101,8 @@ Customers can contact support from **Settings → Support**; they see only their
 
 Neither side needs email: customers see a badge on **Workspace settings** and a "New reply" marker on the request, and staff see a count on **Control room** and the **Cases** tab for open cases where the customer spoke last. Counts refresh every 30 seconds.
 
+Optional outbound alerts (set `SMTP_URL`, `SMTP_FROM`, `SUPPORT_ALERT_EMAIL`, and/or `SUPPORT_WEBHOOK_URL`, see `.env.example`): staff are emailed or sent a webhook message (Slack-compatible) when a request arrives or a customer replies, and customers are emailed when staff post a customer-visible reply. Messages say only that something needs attention and link to the app; request text is never sent. Delivery failures are logged and never block a request.
+
 Privacy boundaries: staff see masked email addresses by default and must give a
 reason to reveal one. QR content, visitor records, uploaded media, and passwords
 are never exposed through the control room. Customer views, reveals, case

@@ -20,6 +20,29 @@ function flag(env, name, fallback, yes = "true", no = "false") {
   return raw === yes;
 }
 
+function notificationsFromEnv(env) {
+  const smtpUrl = env.SMTP_URL?.trim() || "",
+    webhookUrl = env.SUPPORT_WEBHOOK_URL?.trim() || "",
+    staffEmails = (env.SUPPORT_ALERT_EMAIL || "")
+      .split(",")
+      .map((value) => value.trim())
+      .filter(Boolean);
+  if (smtpUrl && !/^smtps?:\/\//.test(smtpUrl))
+    throw new Error("SMTP_URL must start with smtp:// or smtps://.");
+  if (webhookUrl && !/^https?:\/\//.test(webhookUrl))
+    throw new Error("SUPPORT_WEBHOOK_URL must be an http(s) URL.");
+  if (staffEmails.some((value) => !/^[^\s@]+@[^\s@]+$/.test(value)))
+    throw new Error("SUPPORT_ALERT_EMAIL must list email addresses.");
+  if (staffEmails.length && !smtpUrl)
+    throw new Error("SUPPORT_ALERT_EMAIL requires SMTP_URL.");
+  return {
+    smtpUrl,
+    webhookUrl,
+    staffEmails,
+    from: env.SMTP_FROM?.trim() || "",
+  };
+}
+
 // Validate everything before creating directories, opening SQLite or listening.
 export function loadConfig(env = process.env) {
   const production = env.NODE_ENV === "production";
@@ -96,5 +119,6 @@ export function loadConfig(env = process.env) {
           : integer(env, "PLAN_BUSINESS_MONTHLY_INR", 0, 1, 10000000),
     },
     storageOptions: storageOptionsFromEnv(env),
+    notifications: notificationsFromEnv(env),
   };
 }

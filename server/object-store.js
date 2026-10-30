@@ -7,7 +7,7 @@ import {
 } from "@aws-sdk/client-s3";
 import { pipeline } from "node:stream/promises";
 import { createWriteStream, createReadStream } from "node:fs";
-import {stat} from 'node:fs/promises';
+import { stat } from "node:fs/promises";
 export function storageOptionsFromEnv(env = process.env) {
   const quota = Number(env.WORKSPACE_STORAGE_MB ?? 1024) * 1024 * 1024,
     maxUpload = Number(env.MAX_UPLOAD_MB ?? 100) * 1024 * 1024;
@@ -21,14 +21,15 @@ export function storageOptionsFromEnv(env = process.env) {
     throw new Error(
       "Use positive storage limits; MAX_UPLOAD_MB cannot exceed 500.",
     );
-  if (!env.S3_BUCKET&&!env.S3_BACKUP_BUCKET) return { quota, maxUpload };
+  if (!env.S3_BUCKET && !env.S3_BACKUP_BUCKET) return { quota, maxUpload };
   if (env.S3_ENDPOINT) {
     const url = new URL(env.S3_ENDPOINT);
     if (
       url.protocol !== "https:" &&
       !(
         url.protocol === "http:" &&
-        (["localhost", "127.0.0.1", "[::1]"].includes(url.hostname)||env.S3_ALLOW_HTTP==='true')
+        (["localhost", "127.0.0.1", "[::1]"].includes(url.hostname) ||
+          env.S3_ALLOW_HTTP === "true")
       )
     )
       throw new Error(
@@ -37,18 +38,30 @@ export function storageOptionsFromEnv(env = process.env) {
     if (url.username || url.password || url.search || url.hash)
       throw new Error("Use a plain S3 endpoint URL.");
   }
-  const common={endpoint:env.S3_ENDPOINT,region:env.S3_REGION||env.AWS_REGION||'us-east-1',forcePathStyle:env.S3_FORCE_PATH_STYLE==='true'};
+  const common = {
+    endpoint: env.S3_ENDPOINT,
+    region: env.S3_REGION || env.AWS_REGION || "us-east-1",
+    forcePathStyle: env.S3_FORCE_PATH_STYLE === "true",
+  };
   return {
     quota,
     maxUpload,
-    objectStore: env.S3_BUCKET?createObjectStore({
-      bucket: env.S3_BUCKET,
-      prefix: env.S3_PREFIX || "openqr/media/",
-      endpoint: env.S3_ENDPOINT,
-      region: env.S3_REGION || env.AWS_REGION || "us-east-1",
-      forcePathStyle: env.S3_FORCE_PATH_STYLE === "true",
-    }):undefined,
-    backupStore:env.S3_BACKUP_BUCKET?createObjectStore({...common,bucket:env.S3_BACKUP_BUCKET,prefix:env.S3_BACKUP_PREFIX||'openqr/backups/'}):undefined,
+    objectStore: env.S3_BUCKET
+      ? createObjectStore({
+          bucket: env.S3_BUCKET,
+          prefix: env.S3_PREFIX || "openqr/media/",
+          endpoint: env.S3_ENDPOINT,
+          region: env.S3_REGION || env.AWS_REGION || "us-east-1",
+          forcePathStyle: env.S3_FORCE_PATH_STYLE === "true",
+        })
+      : undefined,
+    backupStore: env.S3_BACKUP_BUCKET
+      ? createObjectStore({
+          ...common,
+          bucket: env.S3_BACKUP_BUCKET,
+          prefix: env.S3_BACKUP_PREFIX || "openqr/backups/",
+        })
+      : undefined,
     backupBucket: env.S3_BACKUP_BUCKET,
     backupPrefix: env.S3_BACKUP_PREFIX || "openqr/backups/",
   };
@@ -157,7 +170,7 @@ export function createObjectStore({
           Bucket: targetBucket,
           Key: targetPrefix.replace(/\/?$/, "/") + name,
           Body: createReadStream(path),
-          ContentLength:(await stat(path)).size,
+          ContentLength: (await stat(path)).size,
           ContentType: "application/gzip",
         }),
         { abortSignal: AbortSignal.timeout(120000) },

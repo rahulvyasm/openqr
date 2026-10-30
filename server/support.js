@@ -20,7 +20,7 @@ export const maskEmail = (email = "") => {
 export const isSuspended = (db, userId) =>
   !!db.prepare("SELECT 1 FROM config WHERE key=?").get(`suspended:${userId}`);
 
-export function registerSupportRoutes(app, db, entitlements) {
+export function registerSupportRoutes(app, db, entitlements, notifier) {
   db.exec(`
     CREATE TABLE IF NOT EXISTS support_cases (number INTEGER PRIMARY KEY AUTOINCREMENT,workspace_id TEXT NOT NULL REFERENCES workspaces(id),user_id TEXT REFERENCES users(id),category TEXT NOT NULL,priority TEXT NOT NULL,status TEXT NOT NULL,subject TEXT NOT NULL,created_by TEXT REFERENCES users(id),assigned_to TEXT REFERENCES users(id),created_at TEXT NOT NULL,updated_at TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS support_notes (id INTEGER PRIMARY KEY,case_number INTEGER NOT NULL REFERENCES support_cases(number),author_id TEXT REFERENCES users(id),body TEXT NOT NULL,created_at TEXT NOT NULL);
@@ -334,6 +334,15 @@ export function registerSupportRoutes(app, db, entitlements) {
       );
       log(req.user.id, "case.note_added", "case", id);
     });
+    if (visibility === "public") {
+      const contact = db
+        .prepare(
+          "SELECT u.id,u.email FROM support_cases c JOIN users u ON u.id=c.user_id WHERE c.number=?",
+        )
+        .get(id);
+      if (contact && contact.id !== req.user.id && !isSuspended(db, contact.id))
+        void notifier.customerReply(contact.email, id);
+    }
     res.status(201).json({ ok: true });
   });
   app.patch("/api/operator/cases/:number", (req, res) => {
@@ -444,6 +453,7 @@ export function registerSupportRoutes(app, db, entitlements) {
       ).run(created, req.user.id, input.message, at);
       return created;
     });
+    void notifier.staffAlert("new", id, req.workspace.name);
     res.status(201).json(mine(req, id));
   });
   app.get("/api/support/requests/:number", (req, res) => {
@@ -484,6 +494,7 @@ export function registerSupportRoutes(app, db, entitlements) {
           "UPDATE support_cases SET updated_at=?,status=CASE WHEN status IN ('resolved','pending') THEN 'open' ELSE status END WHERE number=?",
         ).run(now(), id);
       });
+      void notifier.staffAlert("reply", id, req.workspace.name);
       res.status(201).json({ ok: true });
     },
   );
