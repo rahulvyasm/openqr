@@ -67,6 +67,12 @@ import DesignStudio from "./components/DesignStudio";
 import BatchBar from "./components/BatchBar";
 import DownloadDialog from "./components/DownloadDialog";
 import AnalyticsDetails from "./components/AnalyticsDetails";
+import StudioHero, { type StudioDraft } from "./components/StudioHero";
+import CommandMenu from "./components/CommandMenu";
+import CampaignPulse from "./components/CampaignPulse";
+import ProfileMenu from "./components/ProfileMenu";
+import ScanChart from "./components/ScanChart";
+import "./studio.css";
 import { typeIcons as icons } from "./components/codeTypes";
 import "@fontsource/dm-sans/latin-400.css";
 import "@fontsource/dm-sans/latin-500.css";
@@ -137,7 +143,7 @@ function Auth({ setup, onSuccess }: { setup: boolean; onSuccess: () => void }) {
             <span className="art-badge">
               <Leaf size={16} /> Yours to build on
             </span>
-            <span className="art-spark">✳</span>
+            <span className="art-spark">âœ³</span>
           </div>
         </div>
         <span className="auth-footer">
@@ -146,9 +152,7 @@ function Auth({ setup, onSuccess }: { setup: boolean; onSuccess: () => void }) {
       </div>
       <main className="auth-form-side">
         <div className="auth-form-wrap">
-          <span className="small-label">
-            YOUR OWN LITTLE CORNER OF THE INTERNET
-          </span>
+          <span className="small-label">OPENQR / YOUR CONNECTION STUDIO</span>
           <h2>{setup ? "Make yourself at home." : "Welcome back."}</h2>
           <p>
             {setup
@@ -216,7 +220,7 @@ function Auth({ setup, onSuccess }: { setup: boolean; onSuccess: () => void }) {
           )}
           {recoveryHelp && (
             <Modal
-              title="Let’s get you back in."
+              title="Letâ€™s get you back in."
               onClose={() => setRecoveryHelp(false)}
             >
               <div className="simple-form">
@@ -247,86 +251,6 @@ function Auth({ setup, onSuccess }: { setup: boolean; onSuccess: () => void }) {
     </div>
   );
 }
-function ScanChart({ analytics }: { analytics: Analytics | null }) {
-  if (!analytics)
-    return (
-      <div className="chart-loading">
-        <Loader2 className="spin" />
-      </div>
-    );
-  const values = analytics.daily;
-  const max = Math.max(4, ...values.map((d) => d.scans));
-  const width = 800;
-  const height = 150;
-  const points = values
-    .map(
-      (d, i) =>
-        `${(i / Math.max(1, values.length - 1)) * width},${height - (d.scans / max) * (height - 15)}`,
-    )
-    .join(" ");
-  return (
-    <div className="chart-wrap">
-      <div className="chart-axis">
-        <span>{max}</span>
-        <span>{Math.round(max / 2)}</span>
-        <span>0</span>
-      </div>
-      <div className="chart-body">
-        <svg
-          viewBox={`0 0 ${width} ${height}`}
-          preserveAspectRatio="none"
-          role="img"
-          aria-label={`Scan activity: ${analytics.total} scans in the last ${analytics.days} days`}
-        >
-          <defs>
-            <linearGradient id="chart-fill" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#87bda3" stopOpacity="0.35" />
-              <stop offset="100%" stopColor="#87bda3" stopOpacity="0.02" />
-            </linearGradient>
-          </defs>
-          {[0, 0.5, 1].map((n) => (
-            <line
-              key={n}
-              x1="0"
-              x2={width}
-              y1={height * n}
-              y2={height * n}
-              stroke="#e8ece7"
-              strokeDasharray="4 5"
-            />
-          ))}
-          <polygon
-            points={`0,${height} ${points} ${width},${height}`}
-            fill="url(#chart-fill)"
-          />
-          <polyline
-            points={points}
-            fill="none"
-            stroke="#42785c"
-            strokeWidth="2.5"
-            vectorEffect="non-scaling-stroke"
-          />
-        </svg>
-        <div className="chart-dates">
-          {[
-            values[0],
-            values[Math.floor(values.length / 2)],
-            values.at(-1),
-          ].map((d, i) => (
-            <span key={i}>
-              {d &&
-                new Date(d.date + "T12:00:00Z").toLocaleDateString(undefined, {
-                  month: "short",
-                  day: "numeric",
-                  timeZone: "UTC",
-                })}
-            </span>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
 export default function App() {
   const [auth, setAuth] = useState<AuthState | null>(null);
   const [accessLink, setAccessLink] = useState<AccessLink | null>(
@@ -340,6 +264,8 @@ export default function App() {
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
   const [days, setDays] = useState(30);
   const [page, setPage] = useState("codes");
+  const [settingsTab, setSettingsTab] = useState("team");
+  const [settingsVisit, setSettingsVisit] = useState(0);
   const [folder, setFolder] = useState("");
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("all");
@@ -352,6 +278,34 @@ export default function App() {
   const [toast, setToast] = useState("");
   const [menu, setMenu] = useState("");
   const [mobileNav, setMobileNav] = useState(false);
+  const [compactNav, setCompactNav] = useState(
+    () => window.matchMedia("(max-width: 700px)").matches,
+  );
+  const sidebarRef = useRef<HTMLElement>(null);
+  const navToggleRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 700px)");
+    const update = () => {
+      setCompactNav(media.matches);
+      if (!media.matches) setMobileNav(false);
+    };
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
+  useEffect(() => {
+    if (!mobileNav || !compactNav) return;
+    sidebarRef.current
+      ?.querySelector<HTMLButtonElement>("button:not(:disabled)")
+      ?.focus();
+    const dismiss = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setMobileNav(false);
+        navToggleRef.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", dismiss);
+    return () => window.removeEventListener("keydown", dismiss);
+  }, [mobileNav, compactNav]);
   const [folderError, setFolderError] = useState("");
   const [templates, setTemplates] = useState<DesignTemplate[]>([]);
   const [initialDesign, setInitialDesign] = useState<
@@ -361,6 +315,44 @@ export default function App() {
   const [selection, setSelection] = useState<string[]>([]);
   const [download, setDownload] = useState<Code | null>(null);
   const [pageNumber, setPageNumber] = useState(1);
+  const [commandOpen, setCommandOpen] = useState(false);
+  const [draft, setDraft] = useState<StudioDraft | undefined>();
+  const [sort, setSort] = useState("newest");
+  useEffect(() => {
+    const shortcut = (event: KeyboardEvent) => {
+      if (!auth?.user || !auth.workspace) return;
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        if (document.querySelector("dialog[open]") && !commandOpen) return;
+        event.preventDefault();
+        setCommandOpen((value) => !value);
+        return;
+      }
+      const target = event.target as HTMLElement;
+      if (
+        event.repeat ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.altKey ||
+        target.closest(
+          'input,textarea,select,[contenteditable="true"],dialog[open]',
+        ) ||
+        document.querySelector("dialog[open]")
+      )
+        return;
+      if (event.key === "/") {
+        event.preventDefault();
+        setCommandOpen(true);
+      }
+      if (event.key.toLowerCase() === "n" && mayEdit(auth.workspace.role)) {
+        event.preventDefault();
+        setDraft(undefined);
+        setInitialDesign(undefined);
+        setEditor("new");
+      }
+    };
+    window.addEventListener("keydown", shortcut);
+    return () => window.removeEventListener("keydown", shortcut);
+  }, [auth?.user?.id, auth?.workspace?.id, auth?.workspace?.role, commandOpen]);
   const loadTemplates = () => {
     const run = generation.current;
     return api<DesignTemplate[]>("/templates")
@@ -387,6 +379,8 @@ export default function App() {
           setFolder("");
           setDetail(null);
           setEditor(null);
+          setCommandOpen(false);
+          setDraft(undefined);
         }
         setAuth(data);
       })
@@ -487,7 +481,7 @@ export default function App() {
   useEffect(() => {
     setPageNumber(1);
     setSelection([]);
-  }, [search, filter, folder]);
+  }, [search, filter, folder, sort]);
   if (bootError)
     return (
       <div className="boot">
@@ -584,8 +578,21 @@ export default function App() {
         .toLowerCase()
         .includes(search.toLowerCase()),
   );
+  filtered.sort((a, b) =>
+    sort === "scans"
+      ? b.scans - a.scans || a.name.localeCompare(b.name)
+      : sort === "name"
+        ? a.name.localeCompare(b.name)
+        : Date.parse(b.createdAt) - Date.parse(a.createdAt),
+  );
   const visibleCodes = filtered.slice((pageNumber - 1) * 20, pageNumber * 20);
+  const createDraft = (value: StudioDraft) => {
+    setDraft(value);
+    setInitialDesign(undefined);
+    setEditor("new");
+  };
   const navigate = (next: string, f = "") => {
+    window.scrollTo(0, 0);
     setPage(next);
     setSelection([]);
     setFolder(f);
@@ -661,16 +668,49 @@ export default function App() {
   return (
     <div className="app-shell">
       <button
+        ref={navToggleRef}
         className="mobile-menu icon-button"
         aria-label="Open navigation"
+        aria-expanded={mobileNav}
+        aria-controls="workspace-navigation"
         onClick={() => setMobileNav(!mobileNav)}
       >
         <Menu />
       </button>
       {mobileNav && (
-        <div className="nav-backdrop" onClick={() => setMobileNav(false)} />
+        <button
+          className="nav-backdrop"
+          aria-label="Close navigation"
+          onClick={() => {
+            setMobileNav(false);
+            navToggleRef.current?.focus();
+          }}
+        />
       )}
-      <aside className={`sidebar ${mobileNav ? "is-open" : ""}`}>
+      <aside
+        id="workspace-navigation"
+        ref={sidebarRef}
+        aria-label="Workspace navigation"
+        inert={compactNav && !mobileNav}
+        className={`sidebar ${mobileNav ? "is-open" : ""}`}
+        onKeyDown={(event) => {
+          if (!mobileNav || !compactNav || event.key !== "Tab") return;
+          const targets = Array.from(
+            sidebarRef.current?.querySelectorAll<HTMLElement>(
+              "button:not(:disabled),a[href],input:not(:disabled)",
+            ) || [],
+          ).filter((element) => element.getClientRects().length > 0);
+          const first = targets[0],
+            last = targets.at(-1);
+          if (event.shiftKey && document.activeElement === first) {
+            event.preventDefault();
+            last?.focus();
+          } else if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault();
+            first?.focus();
+          }
+        }}
+      >
         <Brand />
         <WorkspaceSwitcher
           workspace={auth.workspace}
@@ -687,7 +727,7 @@ export default function App() {
             onClick={() => navigate("codes")}
           >
             <QrCode size={19} />
-            <span>My QR codes</span>
+            <span>QR workspace</span>
             <span className="nav-count">{codes.length}</span>
           </button>
           <button
@@ -703,7 +743,7 @@ export default function App() {
           >
             <Palette size={19} />
             <span>Design studio</span>
-            <span className="nav-new">NEW</span>
+            <span className="nav-new">CREATE</span>
           </button>
           <button
             className={page === "media" ? "nav-item selected" : "nav-item"}
@@ -711,7 +751,6 @@ export default function App() {
           >
             <Upload size={19} />
             <span>Media library</span>
-            <span className="nav-new">NEW</span>
           </button>
         </nav>
         <div className="nav-label folder-label">
@@ -761,11 +800,11 @@ export default function App() {
             <span className="open-icon">
               <Code2 size={19} />
             </span>
-            <strong>Good things are open.</strong>
+            <strong>Yours. All the way.</strong>
             <p>
-              No subscriptions. No limits.
+              Independent. Self-hosted.
               <br />
-              Just you and your next idea.
+              Your connections, your control.
             </p>
             <span className="open-license">
               <span className="tiny-dot" /> MIT LICENSED
@@ -778,41 +817,60 @@ export default function App() {
             <Settings size={18} />
             <span>Workspace settings</span>
           </button>
-          <button className="profile" onClick={() => navigate("settings")}>
-            <span className="profile-avatar">
-              {auth.user.name[0].toUpperCase()}
-            </span>
-            <span>
-              <strong>{auth.user.name}</strong>
-              <small>{auth.workspace?.role || "Account"} access</small>
-            </span>
-            <Ellipsis size={18} />
-          </button>
+          <ProfileMenu
+            name={auth.user.name}
+            role={auth.workspace?.role || "Account"}
+            onAccount={() => {
+              setSettingsTab("account");
+              setSettingsVisit((v) => v + 1);
+              navigate("settings");
+            }}
+            onWorkspace={() => {
+              setSettingsTab("workspace");
+              setSettingsVisit((v) => v + 1);
+              navigate("settings");
+            }}
+            onTeam={() => {
+              setSettingsTab("team");
+              setSettingsVisit((v) => v + 1);
+              navigate("settings");
+            }}
+            onSignOut={signOut}
+          />
         </div>
       </aside>
-      <div className="main-shell">
+      <div className="main-shell" inert={compactNav && mobileNav}>
         <header className="topbar">
           <div className="breadcrumb">
             Workspace<span>/</span>
             <strong>
               {page === "analytics"
-                ? "Analytics"
-                : page === "designs"
-                  ? "Design studio"
-                  : page === "media"
-                    ? "Media library"
-                    : page === "settings"
-                      ? "Settings"
-                      : folder
-                        ? folders.find((f) => f.id === folder)?.name
-                        : "My QR codes"}
+                  ? "Analytics"
+                  : page === "designs"
+                    ? "Design studio"
+                    : page === "media"
+                      ? "Media library"
+                      : page === "settings"
+                        ? "Settings"
+                        : folder
+                          ? folders.find((f) => f.id === folder)?.name
+                          : "QR workspace"}
             </strong>
           </div>
+          <button
+            className="command-trigger"
+            onClick={() => setCommandOpen(true)}
+            aria-label="Open command menu"
+          >
+            <Search size={15} />
+            <span>Jump to anything</span>
+            <kbd>Ctrl K</kbd>
+          </button>
           <span className="topbar-open">
-            <span className="tiny-dot" /> Open source, always
+            <span className="signal-dot" /> INDEPENDENT BY DESIGN
           </span>
         </header>
-        <main className="main-content">
+        <main className="main-content" key={page}>
           {!auth.workspace && page !== "settings" ? (
             <section className="settings-panel workspace-welcome">
               <h2>A fresh workspace awaits.</h2>
@@ -836,6 +894,8 @@ export default function App() {
             />
           ) : page === "settings" ? (
             <SettingsView
+              key={`${auth.workspace?.id}:${settingsTab}:${settingsVisit}`}
+              initialTab={settingsTab}
               auth={auth}
               onAuthChange={loadAuth}
               onSignOut={signOut}
@@ -843,61 +903,65 @@ export default function App() {
             />
           ) : (
             <>
-              <div className="page-heading">
-                <div>
-                  <span className="eyebrow">
-                    {page === "analytics"
-                      ? "A CLOSER LOOK AT YOUR CONNECTIONS"
-                      : "SMALL CODES. BIG POSSIBILITIES."}
-                  </span>
-                  <h1>
-                    {page === "analytics"
-                      ? "Every scan tells a story"
-                      : folder
-                        ? folders.find((f) => f.id === folder)?.name
-                        : "Your connections start here"}
-                    <span>.</span>
-                  </h1>
-                  <p>
-                    {page === "analytics"
-                      ? "See how people connect with your dynamic QR codes."
-                      : "Create, manage, and see where your QR codes take people."}
-                  </p>
-                </div>
-                {canEdit ? (
-                  <div className="heading-actions">
-                    {page === "codes" && (
-                      <button
-                        className="button secondary"
-                        onClick={() => setBulkOpen(true)}
-                      >
-                        <Upload size={16} />
-                        Import CSV
-                      </button>
-                    )}
-                    <button
-                      className="button primary create-main"
-                      onClick={() => {
-                        setInitialDesign(undefined);
-                        setEditor("new");
-                      }}
-                    >
-                      <Plus size={18} />
-                      Create QR code
-                    </button>
+              {page === "codes" && !folder ? (
+                <StudioHero canEdit={canEdit} onCreate={createDraft} />
+              ) : (
+                <div className="page-heading">
+                  <div>
+                    <span className="eyebrow">
+                      {page === "analytics"
+                        ? "THE SIGNAL BEHIND EVERY SCAN"
+                        : "YOUR CAMPAIGN COLLECTION"}
+                    </span>
+                    <h1>
+                      {page === "analytics"
+                        ? "Follow the signal"
+                        : folder
+                          ? folders.find((f) => f.id === folder)?.name
+                          : "Your connections start here"}
+                      <span>.</span>
+                    </h1>
+                    <p>
+                      {page === "analytics"
+                        ? "See how people connect with your dynamic QR codes."
+                        : "Create, manage, and see where your QR codes take people."}
+                    </p>
                   </div>
-                ) : (
-                  <span className="viewer-notice">
-                    Viewer access · Browse and download
-                  </span>
-                )}
-              </div>
+                  {canEdit ? (
+                    <div className="heading-actions">
+                      {page === "codes" && (
+                        <button
+                          className="button secondary"
+                          onClick={() => setBulkOpen(true)}
+                        >
+                          <Upload size={16} />
+                          Import CSV
+                        </button>
+                      )}
+                      <button
+                        className="button primary create-main"
+                        onClick={() => {
+                          setInitialDesign(undefined);
+                          setEditor("new");
+                        }}
+                      >
+                        <Plus size={18} />
+                        Create QR code
+                      </button>
+                    </div>
+                  ) : (
+                    <span className="viewer-notice">
+                      Viewer access Â· Browse and download
+                    </span>
+                  )}
+                </div>
+              )}
               <section className="stats-grid">
                 <div className="stat-card">
                   <div>
                     <span>Total QR codes</span>
                     <strong>{formatNumber(codes.length)}</strong>
-                    <small>Little gateways to your world</small>
+                    <small>Across your workspace</small>
                   </div>
                   <span className="stat-icon green">
                     <QrCode size={21} />
@@ -908,7 +972,8 @@ export default function App() {
                     <span>Total scans</span>
                     <strong>{formatNumber(totalScans)}</strong>
                     <small>
-                      <span className="status-dot" /> All-time connections made
+                      <span className="status-dot" /> All-time dynamic link
+                      visits
                     </small>
                   </div>
                   <span className="stat-icon peach">
@@ -919,65 +984,75 @@ export default function App() {
                   <div>
                     <span>Active QR codes</span>
                     <strong>{formatNumber(active)}</strong>
-                    <small>Ready for their next scan</small>
+                    <small>Available to connect</small>
                   </div>
                   <span className="stat-icon lavender">
                     <Activity size={21} />
                   </span>
                 </div>
               </section>
-              <section className="activity-panel">
-                <div className="section-heading">
-                  <div>
-                    <h2>
-                      Scan activity{" "}
-                      <span className="subtle-badge">DYNAMIC CODES</span>
-                    </h2>
-                    <p>
-                      {analytics?.total
-                        ? `${formatNumber(analytics.total)} connection${analytics.total === 1 ? "" : "s"} in the last ${days} days`
-                        : "Your next connection is just a scan away."}
-                    </p>
-                  </div>
-                  <div className="chart-actions">
-                    <button
-                      className="icon-button"
-                      aria-label="Refresh scan analytics"
-                      title="Refresh scan analytics"
-                      onClick={() => {
-                        refresh();
-                        loadAnalytics();
-                      }}
-                    >
-                      <RefreshCw size={14} />
-                    </button>
-                    {page === "analytics" && (
+              <div className={page === "codes" ? "dashboard-signals" : ""}>
+                <section className="activity-panel">
+                  <div className="section-heading">
+                    <div>
+                      <h2>
+                        Scan activity{" "}
+                        <span className="subtle-badge">DYNAMIC CODES</span>
+                      </h2>
+                      <p>
+                        {analytics?.total
+                          ? `Explore your traffic. Hover or use arrow keys on the chart.`
+                          : "Every connection starts with a scan."}
+                      </p>
+                    </div>
+                    <div className="chart-actions">
                       <button
-                        className="button secondary small"
-                        onClick={() => analytics && exportCsv(analytics)}
-                        disabled={!analytics}
+                        className="icon-button"
+                        aria-label="Refresh scan analytics"
+                        title="Refresh scan analytics"
+                        onClick={() => {
+                          refresh();
+                          loadAnalytics();
+                        }}
                       >
-                        <Download size={15} />
-                        Export CSV
+                        <RefreshCw size={14} />
                       </button>
-                    )}
-                    <select
-                      aria-label="Analytics time range"
-                      value={days}
-                      onChange={(e) => setDays(Number(e.target.value))}
-                    >
-                      <option value={7}>Last 7 days</option>
-                      <option value={30}>Last 30 days</option>
-                      <option value={90}>Last 90 days</option>
-                    </select>
+                      {page === "analytics" && (
+                        <button
+                          className="button secondary small"
+                          onClick={() => analytics && exportCsv(analytics)}
+                          disabled={!analytics}
+                        >
+                          <Download size={15} />
+                          Export CSV
+                        </button>
+                      )}
+                      <select
+                        aria-label="Analytics time range"
+                        value={days}
+                        onChange={(e) => setDays(Number(e.target.value))}
+                      >
+                        <option value={7}>Last 7 days</option>
+                        <option value={30}>Last 30 days</option>
+                        <option value={90}>Last 90 days</option>
+                      </select>
+                    </div>
                   </div>
-                </div>
-                {page === "analytics" ? (
-                  analyticsPanel(analytics)
-                ) : (
-                  <ScanChart analytics={analytics} />
+                  {page === "analytics" ? (
+                    analyticsPanel(analytics)
+                  ) : (
+                    <ScanChart analytics={analytics} />
+                  )}
+                </section>
+                {page === "codes" && (
+                  <CampaignPulse
+                    analytics={analytics}
+                    codes={codes}
+                    onCode={setDetail}
+                    onAnalytics={() => navigate("analytics")}
+                  />
                 )}
-              </section>
+              </div>
               {page === "analytics" && (
                 <AnalyticsDetails
                   data={analytics}
@@ -998,6 +1073,24 @@ export default function App() {
                       <span className="count-badge">{filtered.length}</span>
                     </div>
                     <div className="codes-tools">
+                      {canEdit && (
+                        <button
+                          className="button secondary small"
+                          onClick={() => setBulkOpen(true)}
+                        >
+                          <Upload size={14} /> Import CSV
+                        </button>
+                      )}
+                      <select
+                        className="sort-codes"
+                        aria-label="Sort QR codes"
+                        value={sort}
+                        onChange={(e) => setSort(e.target.value)}
+                      >
+                        <option value="newest">Newest first</option>
+                        <option value="scans">Most scanned</option>
+                        <option value="name">Name Aâ€“Z</option>
+                      </select>
                       {filtered.length > 0 && (
                         <label className="select-all">
                           <input
@@ -1034,7 +1127,7 @@ export default function App() {
                           aria-label="Search QR codes"
                           value={search}
                           onChange={(e) => setSearch(e.target.value)}
-                          placeholder="Search your codes…"
+                          placeholder="Search your codesâ€¦"
                         />
                       </div>
                       <div className="view-switch">
@@ -1082,7 +1175,7 @@ export default function App() {
                       </button>
                     ))}
                     <span className="saved-note">
-                      <CheckCircle2 size={13} /> All changes saved
+                      <CheckCircle2 size={13} /> {filtered.length} in view
                     </span>
                   </div>
                   {selection.length > 0 && (
@@ -1106,18 +1199,18 @@ export default function App() {
                         <div className="empty-mini-card">
                           <QrCode size={45} />
                         </div>
-                        <span className="empty-leaf">✳</span>
+                        <span className="empty-leaf">âœ³</span>
                         <span className="empty-dot" />
                       </div>
                       <h3>
                         {codes.length
                           ? "No codes here just yet."
-                          : "Your first connection is waiting."}
+                          : "A blank canvas. A real opportunity."}
                       </h3>
                       <p>
                         {search
                           ? "Try a different name or clear your search."
-                          : "A website, a Wi-Fi network, a little hello.\nTurn something you love into a QR code."}
+                          : "Start with a website, document, or experience.\nYour first code is a few clicks away."}
                       </p>
                       <button
                         className="button primary"
@@ -1239,7 +1332,7 @@ export default function App() {
                               }
                             >
                               <strong>
-                                {code.dynamic ? formatNumber(code.scans) : "—"}
+                                {code.dynamic ? formatNumber(code.scans) : "â€”"}
                               </strong>
                               <span>
                                 {code.dynamic ? "scans" : "untracked"}
@@ -1380,7 +1473,7 @@ export default function App() {
                   {filtered.length > 20 && (
                     <div className="pagination">
                       <span>
-                        {(pageNumber - 1) * 20 + 1}–
+                        {(pageNumber - 1) * 20 + 1}â€“
                         {Math.min(pageNumber * 20, filtered.length)} of{" "}
                         {filtered.length} codes
                       </span>
@@ -1410,11 +1503,8 @@ export default function App() {
                   <Leaf size={19} />
                 </span>
                 <p>
-                  <strong>Made for your ideas. Built on your terms.</strong>
-                  <span>
-                    {" "}
-                    Open source, self-hosted, and a little more human.
-                  </span>
+                  <strong>Small square. Open possibilities.</strong>
+                  <span> Designed to connect the physical and digital.</span>
                 </p>
                 <span className="banner-tag">NO PAYWALLS. EVER.</span>
               </div>
@@ -1422,7 +1512,7 @@ export default function App() {
           )}
           <footer className="page-footer">
             <span>
-              openqr. <span>· A little code goes a long way.</span>
+              openqr. <span> / THE CONNECTION STUDIO</span>
             </span>
             <span>
               Crafted for the open web <ArrowUpRight size={12} />
@@ -1430,6 +1520,24 @@ export default function App() {
           </footer>
         </main>
       </div>
+      {commandOpen && (
+        <CommandMenu
+          codes={codes}
+          canEdit={canEdit}
+          onNavigate={navigate}
+          onCreate={() => {
+            setDraft(undefined);
+            setInitialDesign(undefined);
+            setEditor("new");
+          }}
+          onCode={(code) => {
+            if (code.dynamic) setDetail(code);
+            else if (canEdit) setEditor(code);
+            else setDownload(code);
+          }}
+          onClose={() => setCommandOpen(false)}
+        />
+      )}
       {editor && (
         <Editor
           code={editor === "new" ? undefined : editor}
@@ -1438,8 +1546,12 @@ export default function App() {
           templates={templates}
           initialDesign={editor === "new" ? initialDesign : undefined}
           initialFolder={folder}
+          initialDraft={editor === "new" ? draft : undefined}
           onTemplates={loadTemplates}
-          onClose={() => setEditor(null)}
+          onClose={() => {
+            setEditor(null);
+            setDraft(undefined);
+          }}
           onSave={() => {
             notify(
               editor === "new"
@@ -1447,6 +1559,7 @@ export default function App() {
                 : "Changes saved.",
             );
             setEditor(null);
+            setDraft(undefined);
             setPage("codes");
             refresh();
             loadAnalytics();

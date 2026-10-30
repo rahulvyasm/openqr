@@ -43,6 +43,26 @@ Build this before presenting OpenQR as a public multi-tenant service.
 - Off-server backup destinations, storage monitoring, recovery drills, and stronger operational rollback tooling. Local snapshots and tested restore are in place.
 - Production configuration checks, health/readiness endpoints, and deployment tests. Choose PostgreSQL for a shared hosted service; keep a supported SQLite path for a single-instance self-hosted installation.
 
+Recovery verification: `npm run test:recovery` now exercises the backup/restore CLI
+with a disk-backed disposable workspace, then opens the recovered app and verifies
+permanent links, snapshot scan counts, public PDF downloads, owner/Viewer access,
+new scans, and preservation of the previous installation. It runs in the existing CI
+test suite. Deployment-specific restore rehearsals and remote backup availability
+checks remain operational work.
+
+Startup safeguards now validate production origins, HTTPS/cookie consistency,
+explicit proxy switches, bind/port/data settings, backup scheduling and storage
+limits before creating data files. Process tests cover invalid startup without
+data-directory creation and production-mode loopback startup/restart health probes.
+Public HTTPS/proxy and container deployment rehearsals remain deployment checks.
+
+Storage and backup visibility: workspace settings show quota usage and warnings;
+Owners/Admins can view installation-wide backup policy and persisted local/off-server
+results. Manual and scheduled backups share status recording. Tests cover failed
+snapshots, failed remote copies, successful retries, corrupt status, role boundaries,
+and workspace-scoped usage. Physical free-disk monitoring, external alerts, and
+deployment-specific recovery checks remain operational work.
+
 Acceptance: restoring a backup preserves printed links, workspace memberships, and scan counts. Keep the existing cross-workspace/role, invitation-reuse, and legacy-migration checks passing.
 
 ## Then: publishing and integrations

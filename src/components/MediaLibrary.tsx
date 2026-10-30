@@ -434,11 +434,11 @@ export default function MediaLibrary({ canEdit }: { canEdit: boolean }) {
     <>
       <div className="page-heading">
         <div>
-          <span className="eyebrow">A HOME FOR YOUR CONTENT</span>
+          <span className="eyebrow">YOUR CONTENT, IN GOOD COMPANY</span>
           <h1>
             Your media library<span>.</span>
           </h1>
-          <p>One upload. A world of possibilities.</p>
+          <p>Documents, images, and media. Ready for your next connection.</p>
         </div>
       </div>
       <section className="media-library">

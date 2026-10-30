@@ -12,6 +12,23 @@ _Dashboard from a disposable test workspace. Your instance starts empty._
 
 ## What's included in v0.5
 
+### Connection studio interface
+
+The workspace includes a live QR sketchpad with URL and ink-color handoff to the
+full editor, quick starts for common QR types, and a command menu that searches
+workspace codes, pages, and actions. Press **Ctrl/Cmd K** or **/** to search, and
+**N** to create a code when you are not typing in a field. Inside the command menu,
+use arrow keys and Enter, or Escape to close it.
+
+Scan charts support pointer exploration and keyboard navigation: focus the chart
+and use Left/Right or Home/End to inspect individual UTC dates. Sort the code
+collection by creation date, scans, or name, and switch between list and grid views.
+The interface adapts to phones and tablets and respects reduced-motion preferences.
+The dashboard's Campaign pulse highlights the leading code, most active UTC day,
+and next scheduled launch using the workspace's actual scan and campaign data.
+
+### Platform features
+
 - Account setup, invite-based team signup, password updates, operator-managed recovery, session management, and profile settings.
 - Workspaces with Owner, Admin, Editor, and Viewer roles enforced by the server across codes, exports, folders, designs, analytics, and team administration.
 - Single-use invitations, expiry, renewal, revocation, password-confirmed ownership transfer, and a workspace security activity log.
@@ -108,6 +125,20 @@ The server prevents deletion of files still referenced by a code. Replace/remove
 
 ## Backups and restore
 
+In **Workspace settings → Workspace → Storage and backups**, all members can see
+their workspace's media usage, quota, upload limit, and storage type, with warnings
+at 80% and at the quota limit. Owners and Admins also see installation-wide backup
+status: schedule, local retention, last attempt/completion/failure, and local versus
+off-server results. The panel refreshes every 30 seconds and has a manual refresh.
+
+Manual and scheduled backups record results in `DATA_DIR/backups/backup-status.json`.
+A failed off-server copy is reported separately from a completed local archive.
+Raw error messages, paths, and bucket names are not exposed; the operator can inspect
+server logs for details. Older backups created before status recording are not
+retroactively marked successful. An interrupted attempt remains marked as started
+with no recorded completion. These timestamps do not verify archive availability,
+free disk space, or recovery readiness; continue checking backups and rehearsing restore.
+
 A running server creates its first database + media snapshot after 24 hours of uptime, then every 24 hours. Configure BACKUP_INTERVAL_HOURS (0 disables scheduling; maximum 576 hours) and BACKUP_RETENTION (default 7 archives). Manual backups work while the server runs:
 
 ```sh
@@ -171,6 +202,7 @@ npm run build
 Set `.env` for your deployment, then run `npm start`:
 
 ```dotenv
+NODE_ENV=production
 PORT=3001
 PUBLIC_URL=https://qr.your-domain.com
 COOKIE_SECURE=true
@@ -180,6 +212,19 @@ TRUST_PROXY=1
 ```
 
 Terminate HTTPS at a reverse proxy pointing to port 3001. Do not expose the origin port publicly when trusting a proxy. Requests changing data must include an Origin matching PUBLIC_URL. For local production testing, use PUBLIC_URL=http://localhost:3001 and COOKIE_SECURE=false.
+
+Startup validates settings before creating the data directory or opening the database.
+With `NODE_ENV=production`, `PUBLIC_URL` is required and must use HTTPS with
+`COOKIE_SECURE=true`; HTTP is allowed only for `localhost`, `127.0.0.1`, or `::1`
+for local testing. Use an origin without credentials, a path, query, or fragment.
+`COOKIE_SECURE` accepts only `true`/`false`, and `TRUST_PROXY` only `1`/`0`.
+Invalid ports, empty bind addresses/data directories, invalid backup settings, and
+invalid storage limits stop startup with a configuration error. Development retains
+its localhost defaults. Production binds to `0.0.0.0` unless `HOST` is set.
+
+Deployment probes can use `/health/live` and `/health/ready`; readiness checks the
+database and configured media storage. The automated startup test boots and restarts
+a production-mode local server and checks both endpoints.
 
 **Choose a permanent, publicly reachable PUBLIC_URL before printing dynamic QR codes.** A phone cannot reach your computer through its own `localhost`. If the public origin changes, previously printed codes still point at the old origin. Keep the old domain resolving and forwarding traffic. Dynamic redirects require your server to stay online.
 
@@ -197,6 +242,21 @@ By default, Docker serves http://localhost:3001 and stores data in the `openqr-d
 npm test
 npm run build
 ```
+
+Run the isolated recovery drill with `npm run test:recovery`. It creates a temporary
+disk-backed workspace, invites a Viewer, publishes website/PDF codes, records scans,
+and runs the backup and restore operator commands. The recovered app must preserve
+code IDs and short links, the snapshot's destinations and scan counts, downloadable
+PDF bytes, owner access, and Viewer permissions. It also checks that restore history
+preserves the replaced installation and that new scans still work after recovery.
+The drill runs as part of `npm test` and CI, uses local storage, and ignores local
+environment files and S3 settings. It does not touch your configured data directory.
+
+This checks the release's recovery workflow with disposable data. For your deployment,
+also rehearse restoring an actual backup onto a separate, stopped installation using
+the same release. Keep that installation private, check media and team access, and
+verify the recorded `PUBLIC_URL` before switching traffic. An isolated drill cannot
+verify your public domain, reverse proxy, remote credentials, or backup availability.
 
 Tests exercise authentication, CSRF protection, ownership isolation, redirect tracking, destination edits, campaign limits, safe hosted pages, static content immutability, folders, atomic bulk operations, ZIP contents, template persistence, and migration from the original database schema. Download tests decode generated PNGs to check the actual encoded QR content, including every module/finder/frame combination and a logo-bearing code.
 

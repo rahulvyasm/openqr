@@ -19,9 +19,9 @@ export default function DesignStudio({
     <>
       <div className="page-heading">
         <div>
-          <span className="eyebrow">A LITTLE MORE YOU</span>
+          <span className="eyebrow">FORM / COLOR / CHARACTER</span>
           <h1>
-            Good design opens doors<span>.</span>
+            Built to stand out<span>.</span>
           </h1>
           <p>Pick a starting point. Make it unmistakably yours.</p>
         </div>

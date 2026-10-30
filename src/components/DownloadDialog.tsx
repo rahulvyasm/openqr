@@ -4,6 +4,7 @@ import type { Code } from "../lib";
 import Modal from "./Modal";
 import QrImage from "./QrImage";
 import { codeContent } from "../lib";
+import LocalLinkNotice from "./LocalLinkNotice";
 export default function DownloadDialog({
   code,
   onClose,
@@ -26,6 +27,7 @@ export default function DownloadDialog({
         </div>
         <h3>{code.name}</h3>
         <p>Download your final, scannable code.</p>
+        {code.dynamic && <LocalLinkNotice url={code.shortUrl} />}
         <div className="format-options">
           <button
             className={format === "png" ? "selected" : ""}

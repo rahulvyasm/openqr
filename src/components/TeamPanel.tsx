@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { api, mayManage, type AuthState, type Member, type Role } from "../lib";
 import Modal from "./Modal";
+import RoleSelect from "./RoleSelect";
 type Invite = { id: string; email: string; role: Role; expires: number };
 const roleText = {
   owner: "Full control, including ownership.",
@@ -37,6 +38,7 @@ export default function TeamPanel({
     [busy, setBusy] = useState(false),
     [remove, setRemove] = useState<Member | null>(null),
     [transfer, setTransfer] = useState(false);
+  const [inviteRole, setInviteRole] = useState("editor");
   const role = auth.workspace?.role,
     manager = mayManage(role),
     owner = role === "owner";
@@ -121,16 +123,13 @@ export default function TeamPanel({
                   <span>{member.email}</span>
                 </div>
                 {editable ? (
-                  <select
-                    aria-label={`Role for ${member.name}`}
+                  <RoleSelect
+                    label={`Role for ${member.name}`}
                     value={member.role}
                     disabled={busy}
-                    onChange={(e) => changeRole(member, e.target.value)}
-                  >
-                    {owner && <option value="admin">Admin</option>}
-                    <option value="editor">Editor</option>
-                    <option value="viewer">Viewer</option>
-                  </select>
+                    allowAdmin={owner}
+                    onChange={(value) => changeRole(member, value)}
+                  />
                 ) : (
                   <span className={`role-badge ${member.role}`}>
                     {member.role === "owner" && <Crown size={11} />}{" "}
@@ -339,16 +338,14 @@ export default function TeamPanel({
               </label>
               <label>
                 Workspace role
-                <select name="role" defaultValue="editor">
-                  {owner && <option value="admin">Admin</option>}
-                  <option value="editor">Editor</option>
-                  <option value="viewer">Viewer</option>
-                </select>
+                <RoleSelect
+                  name="role"
+                  value={inviteRole}
+                  onChange={setInviteRole}
+                  allowAdmin={owner}
+                />
               </label>
-              <p>
-                Editors create and manage codes. Viewers can view analytics and
-                download codes.
-              </p>
+              <p>{roleText[inviteRole as Role]}</p>
               {error && (
                 <div className="form-error" role="alert">
                   {error}

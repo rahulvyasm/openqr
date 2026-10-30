@@ -4,6 +4,12 @@ import { api, type Asset, type CodeType, type PageOptions } from "../lib";
 import { AssetPicker } from "./MediaLibrary";
 import CollectionFields, { CollectionPreview } from "./CollectionFields";
 import PageTemplates from "./PageTemplates";
+import SocialIcon from "./SocialIcon";
+import {
+  socialPlatforms,
+  socialLinkError,
+  socialUrlKey,
+} from "../../shared/social.js";
 type Props = {
   type: CodeType;
   data: Record<string, string>;
@@ -14,17 +20,8 @@ type Props = {
     data: Record<string, string>,
     options: PageOptions,
   ) => void;
+  onDirectLink?: (url: string) => void;
 };
-const platforms = [
-  "website",
-  "instagram",
-  "facebook",
-  "linkedin",
-  "youtube",
-  "tiktok",
-  "x",
-  "github",
-];
 export default function PublishingFields({
   type,
   data,
@@ -32,6 +29,7 @@ export default function PublishingFields({
   options,
   onOptions,
   onApplyTemplate,
+  onDirectLink,
 }: Props) {
   const [picker, setPicker] = useState<
       "pdfId" | "portraitId" | "coverId" | null
@@ -120,6 +118,21 @@ export default function PublishingFields({
   try {
     links = JSON.parse(data.links || "[]");
   } catch {}
+  const linkErrors = links.map((link, index) => {
+    const error = socialLinkError(link);
+    if (error) return error;
+    if (
+      type === "social" &&
+      links.some(
+        (other, j) =>
+          j !== index &&
+          !socialLinkError(other) &&
+          socialUrlKey(other.url) === socialUrlKey(link.url),
+      )
+    )
+      return "This destination is already in your list.";
+    return "";
+  });
   const updateLink = (i: number, key: string, value: string) =>
     onData(
       "links",
@@ -215,22 +228,81 @@ export default function PublishingFields({
       )}
       {["business", "social"].includes(type) && (
         <div className="publishing-links">
+          {type === "social" && (
+            <div className="social-delivery-note">
+              <strong>A page for all your channels</strong>
+              <p>
+                This QR opens your OpenQR social page first. Visitors then
+                choose a platform. It needs your OpenQR server to be reachable.
+              </p>
+              {links.length === 1 && onDirectLink && (
+                <button
+                  className="button secondary small"
+                  type="button"
+                  disabled={!links[0].url || !!linkErrors[0]}
+                  onClick={() => onDirectLink(links[0].url)}
+                >
+                  Use a direct profile QR instead ↗
+                </button>
+              )}
+              <p>
+                {onDirectLink
+                  ? "Direct profile QR: embeds one destination, works without OpenQR, and has no scan tracking or editable destination."
+                  : "For a direct profile QR, create a new Website code with Dynamic link turned off."}
+              </p>
+            </div>
+          )}
           <div className="editor-section-label">
-            {type === "social" ? "YOUR CHANNELS" : "MORE WAYS TO CONNECT"}
+            {type === "social"
+              ? `YOUR CHANNELS · ${links.length}/12`
+              : "MORE WAYS TO CONNECT"}
           </div>
           {links.map((l, i) => (
             <div className="publishing-link-row" key={i}>
+              <div className="social-platform-heading">
+                <SocialIcon platform={l.platform} />
+                <span>
+                  {socialPlatforms.find(
+                    (p) => p.id === (l.platform || "website"),
+                  )?.label || "Website"}
+                </span>
+              </div>
               <div className="field-pair">
                 <label>
                   Platform
                   <select
                     aria-label={`Link ${i + 1} platform`}
                     value={l.platform || "website"}
-                    onChange={(e) => updateLink(i, "platform", e.target.value)}
+                    onChange={(e) =>
+                      onData(
+                        "links",
+                        JSON.stringify(
+                          links.map((link, index) =>
+                            index !== i
+                              ? link
+                              : {
+                                  ...link,
+                                  platform: e.target.value,
+                                  title:
+                                    !link.title.trim() ||
+                                    link.title ===
+                                      socialPlatforms.find(
+                                        (p) =>
+                                          p.id === (link.platform || "website"),
+                                      )?.label
+                                      ? socialPlatforms.find(
+                                          (p) => p.id === e.target.value,
+                                        )!.label
+                                      : link.title,
+                                },
+                          ),
+                        ),
+                      )
+                    }
                   >
-                    {platforms.map((p) => (
-                      <option key={p} value={p}>
-                        {p[0].toUpperCase() + p.slice(1)}
+                    {socialPlatforms.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.label}
                       </option>
                     ))}
                   </select>
@@ -251,9 +323,22 @@ export default function PublishingFields({
                   type="url"
                   aria-label={`Link ${i + 1} URL`}
                   value={l.url}
-                  placeholder="https://…"
+                  placeholder={
+                    socialPlatforms.find(
+                      (p) => p.id === (l.platform || "website"),
+                    )?.placeholder || "https://…"
+                  }
                   maxLength={2000}
                   required
+                  ref={(input) => {
+                    input?.setCustomValidity(linkErrors[i] || "");
+                  }}
+                  aria-invalid={!!l.url && !!linkErrors[i]}
+                  aria-describedby={
+                    l.url && linkErrors[i]
+                      ? `social-link-error-${i}`
+                      : undefined
+                  }
                   onChange={(e) => updateLink(i, "url", e.target.value)}
                 />
                 <button
@@ -270,6 +355,15 @@ export default function PublishingFields({
                   <Trash2 size={15} />
                 </button>
               </div>
+              {l.url && linkErrors[i] && (
+                <p
+                  id={`social-link-error-${i}`}
+                  className="social-link-error"
+                  role="status"
+                >
+                  {linkErrors[i]}
+                </p>
+              )}
             </div>
           ))}
           <button
@@ -281,7 +375,11 @@ export default function PublishingFields({
                 "links",
                 JSON.stringify([
                   ...links,
-                  { platform: "website", title: "", url: "" },
+                  {
+                    platform: type === "social" ? "instagram" : "website",
+                    title: type === "social" ? "Instagram" : "",
+                    url: "",
+                  },
                 ]),
               )
             }
@@ -289,6 +387,10 @@ export default function PublishingFields({
             <Plus size={14} />
             Add a link
           </button>
+          <p className="hint">
+            Up to 12 links. Each needs a label and complete URL. Social platform
+            links must use HTTPS and match the selected platform.
+          </p>
         </div>
       )}
       {type === "business" && (
@@ -501,7 +603,7 @@ export function PagePreview({
     pdf = assets.find((a) => a.id === data.pdfId);
   const title =
     (type === "contact" ? data.fullName : data.title) || "Your page title";
-  let links: { title: string }[] = [];
+  let links: { title: string; platform?: string }[] = [];
   try {
     links = JSON.parse(data.links || "[]");
   } catch {}
@@ -567,9 +669,11 @@ export function PagePreview({
             </>
           )}
           {["business", "social"].includes(type) &&
-            links.slice(0, 4).map((l, i) => (
-              <div className="phone-action" key={i}>
-                {l.title || "Your link"} ↗
+            links.slice(0, 12).map((l, i) => (
+              <div className="phone-action social-preview-link" key={i}>
+                <SocialIcon platform={l.platform} />
+                <span>{l.title || "Your link"}</span>
+                <span aria-hidden="true">↗</span>
               </div>
             ))}
           {type === "business" && data.address && <p>{data.address}</p>}

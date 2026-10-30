@@ -36,6 +36,8 @@ import DesignControls from "./Designer";
 import { typeIcons, typeDescriptions } from "./codeTypes";
 import PublishingFields, { PagePreview } from "./PublishingFields";
 import { useDesignHistory } from "./useDesignHistory";
+import type { StudioDraft } from "./StudioHero";
+import LocalLinkNotice from "./LocalLinkNotice";
 
 const localDate = (value?: string | null) => {
   if (!value) return "";
@@ -51,6 +53,7 @@ export default function Editor({
   templates,
   initialDesign,
   initialFolder,
+  initialDraft,
   onTemplates,
   onClose,
   onSave,
@@ -61,26 +64,36 @@ export default function Editor({
   templates: DesignTemplate[];
   initialDesign?: DesignTemplate;
   initialFolder?: string;
+  initialDraft?: StudioDraft;
   onTemplates: () => void;
   onClose: () => void;
   onSave: () => void;
 }) {
   const [step, setStep] = useState(0),
-    [type, setType] = useState<CodeType>(code?.type || "url"),
+    [type, setType] = useState<CodeType>(
+      code?.type || initialDraft?.type || "url",
+    ),
     [dynamic, setDynamic] = useState(code?.dynamic ?? true),
     [name, setName] = useState(code?.name || "");
   const [preview, setPreview] = useState<"qr" | "page">(
-    code && hasPublishingPage(code.type) ? "page" : "qr",
+    hasPublishingPage(code?.type || initialDraft?.type || "url")
+      ? "page"
+      : "qr",
   );
   const hasPagePreview = hasPublishingPage(type);
   const [data, setData] = useState<Record<string, string>>(
     code?.data || {
       security: "WPA",
       links: JSON.stringify([{ title: "", url: "" }]),
+      ...(initialDraft?.type === "hosted-event"
+        ? { timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone }
+        : {}),
+      ...initialDraft?.data,
     },
   );
   const history = useDesignHistory({
-    color: code?.color || initialDesign?.color || "#163f32",
+    color:
+      code?.color || initialDraft?.color || initialDesign?.color || "#163f32",
     design: { ...defaultDesign, ...(code?.design || initialDesign?.design) },
   });
   const { color, design } = history.current;
@@ -207,6 +220,7 @@ export default function Editor({
               <button
                 type="button"
                 key={i}
+                aria-current={step === i ? "step" : undefined}
                 className={step === i ? "active" : step > i ? "complete" : ""}
                 onClick={() => {
                   setStep(i);
@@ -236,6 +250,7 @@ export default function Editor({
                         type="button"
                         disabled={!!code}
                         key={t}
+                        aria-pressed={type === t}
                         className={`type-option ${type === t ? "selected" : ""}`}
                         onClick={() => {
                           setType(t);
@@ -280,6 +295,17 @@ export default function Editor({
                       setData(data);
                       setPageOptions(options);
                     }}
+                    onDirectLink={
+                      !code
+                        ? (url) => {
+                            setType("url");
+                            setDynamic(false);
+                            setData({ url });
+                            setPreview("qr");
+                            setError("");
+                          }
+                        : undefined
+                    }
                   />
                 )}
                 {type === "url" && (
@@ -532,6 +558,7 @@ export default function Editor({
             )}{" "}
             {step === 2 && (
               <>
+                {isDynamic && <LocalLinkNotice url={publicUrl} />}
                 <div className="editor-section-label">
                   <CalendarClock size={16} />
                   <span>READY FOR THE REAL WORLD</span>

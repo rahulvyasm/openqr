@@ -11,6 +11,7 @@ import {
 import { api, mayManage, type AuthState } from "../lib";
 import TeamPanel from "./TeamPanel";
 import AccountPanel from "./AccountPanel";
+import StorageStatus from "./StorageStatus";
 type Audit = {
   id: number;
   event: string;
@@ -20,6 +21,13 @@ type Audit = {
   actor: string | null;
 };
 const eventNames: Record<string, string> = {
+  "code.created": "Created QR code",
+  "code.updated": "Updated QR code",
+  "code.deleted": "Deleted QR code",
+  "code.duplicated": "Duplicated QR code",
+  "code.paused": "Paused QR code",
+  "code.resumed": "Resumed QR code",
+  "code.moved": "Moved QR code",
   "workspace.created": "Created workspace",
   "workspace.renamed": "Renamed workspace",
   "invitation.created": "Created invitation",
@@ -41,13 +49,15 @@ export default function SettingsView({
   onAuthChange,
   onSignOut,
   notify,
+  initialTab = "team",
 }: {
   auth: AuthState;
   onAuthChange: () => void;
   onSignOut: () => void;
   notify: (s: string) => void;
+  initialTab?: string;
 }) {
-  const [tab, setTab] = useState("team"),
+  const [tab, setTab] = useState(initialTab),
     [events, setEvents] = useState<Audit[]>([]),
     [error, setError] = useState("");
   const manager = mayManage(auth.workspace?.role);
@@ -62,11 +72,11 @@ export default function SettingsView({
     <>
       <div className="page-heading">
         <div>
-          <span className="eyebrow">A HOME FOR YOUR IDEAS</span>
+          <span className="eyebrow">CONTROL ROOM</span>
           <h1>
-            Make room for good things<span>.</span>
+            Your studio. Your rules<span>.</span>
           </h1>
-          <p>Your workspace, your people, and a little peace of mind.</p>
+          <p>Manage your people, workspace, storage, and account.</p>
         </div>
         <span className="settings-header-mark">
           <ShieldCheck size={17} />
@@ -107,87 +117,93 @@ export default function SettingsView({
       ) : tab === "team" ? (
         <TeamPanel auth={auth} onAuthChange={onAuthChange} notify={notify} />
       ) : tab === "workspace" ? (
-        <section className="settings-panel">
-          <div className="settings-panel-heading">
-            <div>
-              <h2>A place that feels like yours.</h2>
+        <>
+          <section className="settings-panel">
+            <div className="settings-panel-heading">
+              <div>
+                <h2>Workspace identity</h2>
+                <p>
+                  Codes, designs, and analytics are shared with this workspace’s
+                  members.
+                </p>
+              </div>
+              <Globe size={21} />
+            </div>
+            <form
+              key={auth.workspace.id}
+              className="settings-form"
+              onSubmit={async (e) => {
+                e.preventDefault();
+                try {
+                  await api(
+                    "/workspace",
+                    Object.fromEntries(new FormData(e.currentTarget)),
+                    "PATCH",
+                  );
+                  onAuthChange();
+                  notify("Workspace name updated.");
+                } catch (e) {
+                  notify((e as Error).message);
+                }
+              }}
+            >
+              <label>
+                Workspace name
+                <input
+                  name="name"
+                  defaultValue={auth.workspace.name}
+                  required
+                  maxLength={80}
+                  readOnly={!manager}
+                />
+              </label>
+              {manager && (
+                <button className="button primary small">
+                  <Check size={15} />
+                  Save workspace
+                </button>
+              )}
+            </form>
+            <dl>
+              <dt>Your access</dt>
+              <dd>
+                <span className={`role-badge ${auth.workspace.role}`}>
+                  {auth.workspace.role}
+                </span>
+              </dd>
+              <dt>Public origin</dt>
+              <dd>{auth.publicUrl}</dd>
+              <dt>License</dt>
+              <dd>MIT</dd>
+            </dl>
+            <div className="info-note">
+              <ShieldCheck size={18} />
               <p>
-                Codes, designs, and analytics are shared with this workspace’s
-                members.
+                Printed QR links stay the same when you switch workspaces,
+                change roles, or remove team members.
               </p>
             </div>
-            <Globe size={21} />
-          </div>
-          <form
-            key={auth.workspace.id}
-            className="settings-form"
-            onSubmit={async (e) => {
-              e.preventDefault();
-              try {
-                await api(
-                  "/workspace",
-                  Object.fromEntries(new FormData(e.currentTarget)),
-                  "PATCH",
-                );
-                onAuthChange();
-                notify("Workspace name updated.");
-              } catch (e) {
-                notify((e as Error).message);
-              }
-            }}
-          >
-            <label>
-              Workspace name
-              <input
-                name="name"
-                defaultValue={auth.workspace.name}
-                required
-                maxLength={80}
-                readOnly={!manager}
-              />
-            </label>
-            {manager && (
-              <button className="button primary small">
-                <Check size={15} />
-                Save workspace
-              </button>
+            {/localhost|127\.0\.0\.1/.test(auth.publicUrl) && (
+              <div className="info-note amber">
+                <Globe size={18} />
+                <p>
+                  This instance uses a local address. Set a permanent public
+                  address before printing dynamic codes for other people.
+                </p>
+              </div>
             )}
-          </form>
-          <dl>
-            <dt>Your access</dt>
-            <dd>
-              <span className={`role-badge ${auth.workspace.role}`}>
-                {auth.workspace.role}
-              </span>
-            </dd>
-            <dt>Public origin</dt>
-            <dd>{auth.publicUrl}</dd>
-            <dt>License</dt>
-            <dd>MIT</dd>
-          </dl>
-          <div className="info-note">
-            <ShieldCheck size={18} />
-            <p>
-              Printed QR links stay the same when you switch workspaces, change
-              roles, or remove team members.
-            </p>
-          </div>
-          {/localhost|127\.0\.0\.1/.test(auth.publicUrl) && (
-            <div className="info-note amber">
-              <Globe size={18} />
-              <p>
-                This instance uses a local address. Set a permanent public
-                address before printing dynamic codes for other people.
-              </p>
-            </div>
-          )}
-        </section>
+          </section>
+          <StorageStatus
+            key={`${auth.workspace.id}:${auth.workspace.role}`}
+            manager={manager}
+          />
+        </>
       ) : tab === "audit" && manager ? (
         <section className="settings-panel">
           <div className="settings-panel-heading">
             <div>
               <h2>The story of your workspace.</h2>
-              <p>The latest 100 team and account security events.</p>
+              <p>The latest 100 QR, media, team, and account events.</p>
             </div>
             <ClipboardList size={21} />
           </div>
@@ -204,6 +220,9 @@ export default function SettingsView({
                   <strong>{eventNames[e.event] || e.event}</strong>
                   <p>
                     {e.actor || "Server operator"}
+                    {e.event.startsWith("code.")
+                      ? ` · ${e.details.name || e.subject}`
+                      : ""}
                     {e.details.to
                       ? ` · ${e.details.from} → ${e.details.to}`
                       : ""}
