@@ -15,6 +15,7 @@ import {
   templates,
   validateExperienceBlocks,
 } from "./experience-blocks.js";
+import { family, itemOf, migrateItems, registerItemRoutes, resolveExperience } from "./experience-items.js";
 import { availability, publicTicket, validPublicTicket } from "./public-access.js";
 
 const MAX_JSON = 18000;
@@ -31,6 +32,7 @@ export function migrateExperiences(db) {
     CREATE TABLE IF NOT EXISTS experience_events (id INTEGER PRIMARY KEY, code_id TEXT NOT NULL REFERENCES codes(id) ON DELETE CASCADE, block_id TEXT NOT NULL, label TEXT NOT NULL, created_at TEXT NOT NULL);
     CREATE INDEX IF NOT EXISTS experience_events_code ON experience_events(code_id, created_at);
   `);
+  migrateItems(db);
 }
 
 const csvCell = (value) => {
@@ -45,8 +47,10 @@ export function registerExperienceRoutes(
   origin,
   analyticsSalt,
   notifier,
+  entitlements,
 ) {
   const lastAlert = new Map();
+  registerItemRoutes(app, db, origin, entitlements);
   const owned = (req) => {
     const row = db
       .prepare(
@@ -54,8 +58,12 @@ export function registerExperienceRoutes(
       )
       .get(req.params.id, req.workspace.id);
     if (!row) throw problem("Experience not found.", 404);
+    if (itemOf(JSON.parse(row.data)))
+      throw problem("This is an item page. Open its template to make changes.");
     return row;
   };
+  const ids = (row) => family(db, row);
+  const marks = (list) => list.map(() => "?").join(",");
   const live = (row) => {
     const data = JSON.parse(row.data);
     return { title: data.title || row.name, blocks: parseBlocks(data) };
@@ -287,21 +295,22 @@ export function registerExperienceRoutes(
   app.get("/api/codes/:id/experience/stats", (req, res) => {
     const row = owned(req),
       { blocks } = live(row),
+      all = ids(row),
       scans = db
-        .prepare("SELECT COUNT(*) n FROM scans WHERE code_id=?")
-        .get(row.id).n,
+        .prepare(`SELECT COUNT(*) n FROM scans WHERE code_id IN (${marks(all)})`)
+        .get(...all).n,
       submissions = db
-        .prepare("SELECT COUNT(*) n FROM experience_submissions WHERE code_id=?")
-        .get(row.id).n,
+        .prepare(`SELECT COUNT(*) n FROM experience_submissions WHERE code_id IN (${marks(all)})`)
+        .get(...all).n,
       taps = db
-        .prepare("SELECT COUNT(*) n FROM experience_events WHERE code_id=?")
-        .get(row.id).n;
+        .prepare(`SELECT COUNT(*) n FROM experience_events WHERE code_id IN (${marks(all)})`)
+        .get(...all).n;
     const perBlock = new Map();
     for (const e of db
       .prepare(
-        "SELECT block_id,label,COUNT(*) n FROM experience_events WHERE code_id=? GROUP BY block_id,label",
+        `SELECT block_id,label,COUNT(*) n FROM experience_events WHERE code_id IN (${marks(all)}) GROUP BY block_id,label`,
       )
-      .all(row.id))
+      .all(...all))
       perBlock.set(`${e.block_id}|${e.label}`, { kind: "tap", ...e });
     const actions = [
       ...[...perBlock.values()].map((e) => ({
@@ -312,9 +321,9 @@ export function registerExperienceRoutes(
       })),
       ...db
         .prepare(
-          "SELECT block_id,form_title,COUNT(*) n FROM experience_submissions WHERE code_id=? GROUP BY block_id,form_title",
+          `SELECT block_id,form_title,COUNT(*) n FROM experience_submissions WHERE code_id IN (${marks(all)}) GROUP BY block_id,form_title`,
         )
-        .all(row.id)
+        .all(...all)
         .map((e) => ({
           blockId: e.block_id,
           label: e.form_title,
@@ -334,6 +343,7 @@ export function registerExperienceRoutes(
 
   const submissionRow = (s) => ({
     id: s.id,
+    item: s.item_name || "",
     blockId: s.block_id,
     form: s.form_title,
     answers: JSON.parse(s.answers),
@@ -341,27 +351,31 @@ export function registerExperienceRoutes(
     read: !!s.read_at,
   });
   app.get("/api/codes/:id/experience/submissions", (req, res) => {
-    const row = owned(req);
+    const row = owned(req),
+      all = ids(row);
     res.json(
       db
         .prepare(
-          "SELECT * FROM experience_submissions WHERE code_id=? ORDER BY id DESC LIMIT 500",
+          `SELECT s.*,CASE WHEN s.code_id<>? THEN c.name END AS item_name FROM experience_submissions s JOIN codes c ON c.id=s.code_id WHERE s.code_id IN (${marks(all)}) ORDER BY s.id DESC LIMIT 500`,
         )
-        .all(row.id)
+        .all(row.id, ...all)
         .map(submissionRow),
     );
   });
   app.get("/api/codes/:id/experience/submissions.csv", (req, res) => {
     const row = owned(req),
+      all = ids(row),
       rows = db
-        .prepare("SELECT * FROM experience_submissions WHERE code_id=? ORDER BY id")
-        .all(row.id)
+        .prepare(
+          `SELECT s.*,CASE WHEN s.code_id<>? THEN c.name END AS item_name FROM experience_submissions s JOIN codes c ON c.id=s.code_id WHERE s.code_id IN (${marks(all)}) ORDER BY s.id`,
+        )
+        .all(row.id, ...all)
         .map(submissionRow);
     const keys = [...new Set(rows.flatMap((r) => Object.keys(r.answers)))];
     const lines = [
-      ["Received", "Form", ...keys].map(csvCell).join(","),
+      ["Received", "Form", "Item", ...keys].map(csvCell).join(","),
       ...rows.map((r) =>
-        [r.createdAt, r.form, ...keys.map((k) => r.answers[k] ?? "")]
+        [r.createdAt, r.form, r.item, ...keys.map((k) => r.answers[k] ?? "")]
           .map(csvCell)
           .join(","),
       ),
@@ -373,16 +387,18 @@ export function registerExperienceRoutes(
   });
   app.post("/api/codes/:id/experience/submissions/read", (req, res) => {
     const row = owned(req);
+    const all = ids(row);
     db.prepare(
-      "UPDATE experience_submissions SET read_at=? WHERE code_id=? AND read_at IS NULL",
-    ).run(new Date().toISOString(), row.id);
+      `UPDATE experience_submissions SET read_at=? WHERE code_id IN (${marks(all)}) AND read_at IS NULL`,
+    ).run(new Date().toISOString(), ...all);
     res.json({ ok: true });
   });
   app.delete("/api/codes/:id/experience/submissions/:sid", (req, res) => {
     const row = owned(req);
+    const all = ids(row);
     db.prepare(
-      "DELETE FROM experience_submissions WHERE id=? AND code_id=?",
-    ).run(Number(req.params.sid), row.id);
+      `DELETE FROM experience_submissions WHERE id=? AND code_id IN (${marks(all)})`,
+    ).run(Number(req.params.sid), ...all);
     res.json({ ok: true });
   });
   app.get("/api/experience/unread", (req, res) =>
@@ -421,12 +437,14 @@ export function registerExperienceRoutes(
       throw problem("Open this page again from its QR code.", 403);
     const blocked = availability(code, { ignoreCap: true });
     if (blocked) throw problem(blocked.message, blocked.status);
-    return row;
+    const resolved = resolveExperience(db, row);
+    if (!resolved) throw problem("This page is no longer available.", 404);
+    return Object.assign(row, { resolved });
   };
   app.get("/r/:slug/go/:block", (req, res) => {
     res.set({ "Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow", "Referrer-Policy": "no-referrer" });
     const row = publicExperience(req, req.query),
-      block = parseBlocks(JSON.parse(row.data)).find((b) => b.id === req.params.block);
+      block = parseBlocks(row.resolved.data).find((b) => b.id === req.params.block);
     const index = Number(req.query.i) || 0;
     const target =
       block?.type === "button"
@@ -460,7 +478,7 @@ export function registerExperienceRoutes(
       res.set({ "Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow" });
       const input = req.body || {};
       const row = publicExperience(req, input),
-        data = JSON.parse(row.data),
+        data = row.resolved.data,
         blocks = parseBlocks(data),
         block = blocks.find((b) => b.id === req.params.block && b.type === "form");
       if (!block || !isVisible(block, new Date(), data.timeZone))
@@ -473,13 +491,14 @@ export function registerExperienceRoutes(
               title: data.title || row.name,
               blocks,
               slug: row.slug,
-              pageOptions: pageOptions(row),
+              pageOptions: row.resolved.pageOptions,
               ticket,
             },
             {
               mediaUrl: (id) =>
                 `/r/${encodeURIComponent(row.slug)}/media/${encodeURIComponent(id)}?ticket=${encodeURIComponent(ticket)}`,
               zone: data.timeZone || "UTC",
+              item: row.resolved.item,
               ...extra,
             },
           ),

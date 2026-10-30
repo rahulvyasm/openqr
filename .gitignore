@@ -8,3 +8,6 @@ coverage/
 public/pdfjs/
 .design-data/
 .landing-data/
+.visual-data/
+test-results/
+playwright-report/

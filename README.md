@@ -207,6 +207,7 @@ An **Experience** is a hosted page you build from blocks: heading, text, image, 
 - **Results:** buttons and links go through a tracked redirect, so Studio shows scans next to taps and submissions. Only http(s), `tel:` and `mailto:` destinations are accepted.
 - **Privacy:** staff in the control room cannot read form responses; they are workspace data.
 - **Time rules (adaptive pages):** any block can be shown only on chosen days and/or between two times in the page's time zone (overnight ranges such as 22:00–02:00 work). Use *Preview as* in Studio to see the page at any moment. Rules are checked on every visit; a hidden form cannot be submitted.
+- **Item pages:** turn an experience into a template for many physical items. In the **Items** tab, paste one item per line (`name, serial, warranty date`) to create a separate code and short link for each. Every item page shows the template's blocks, so one edit updates every printed code, plus its own details through an **Item details** block: name, serial, warranty status and service history (add entries in the Items tab). Responses, taps and scans from item pages roll up into the template's Responses and Results tabs. Deleting the template deletes its items. Item pages count toward your plan's code limit.
 - Images, videos and files must come from the workspace media library. A file used by a published page, a draft or any kept version cannot be deleted until it is replaced everywhere.
 
 The PDF reader uses locally bundled [Mozilla PDF.js](https://mozilla.github.io/pdf.js/) resources (Apache-2.0). It renders pages with bounded canvases, provides accessible extracted text, and does not enable embedded document scripts, interactive forms, or annotations. Scanned documents need the original download for OCR or other editing tools. There is no external viewer or CDN dependency.
@@ -331,6 +332,8 @@ docker compose up --build -d
 By default, Docker serves http://localhost:3001 and stores data in the `openqr-data` volume. Set PUBLIC_URL, COOKIE_SECURE, and TRUST_PROXY in your shell or `.env` for HTTPS hosting. The runtime uses a non-root user. The Docker image build and a running-container smoke test are verified for this release.
 
 ## Development and checks
+
+Visual regression tests (`npm run test:visual`) build the app, start it on a throwaway data folder, and compare screenshots of the landing page, public experience and item pages, and Experience Studio. On Windows they use the installed Microsoft Edge; elsewhere run `npx playwright install chromium` once (or set `VISUAL_CHANNEL=chrome`). Baselines are stored per operating system in `visual/experience.spec.js-snapshots/`; run `npm run test:visual:update` after an intended design change and review the image diff before committing.
 
 ```sh
 npm test

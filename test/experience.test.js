@@ -318,3 +318,100 @@ test("the public page renders every block type without scripts and escapes conte
   assert.match(html, /name="viewport"/);
   assert.match(html, /@media|max-width:480px/);
 });
+
+test("item pages share a template but keep their own details, history and responses", async (t) => {
+  const { request, setup, base } = await fixture(t);
+  await setup();
+  const tpl = [
+    { id: "head1", type: "heading", text: "Your kettle", subtext: "" },
+    { id: "item1", type: "item", title: "About this kettle" },
+    { id: "btn01", type: "button", label: "Manual", url: "https://example.com/m" },
+    form,
+  ];
+  const parent = await (
+    await create(request, { name: "Kettle", data: { title: "Kettle", blocks: JSON.stringify(tpl) } })
+  ).json();
+  const path = `/api/codes/${parent.id}/experience`;
+
+  // Validation
+  assert.equal(
+    (await request(`${path}/items`, { method: "POST", body: { items: [{ name: "x", warrantyUntil: "soon" }] } })).status,
+    400,
+  );
+  const made = await request(`${path}/items`, {
+    method: "POST",
+    body: {
+      items: [
+        { name: "Kettle #1", serial: "SN-001", warrantyUntil: "2099-01-31" },
+        { name: "Kettle #2", serial: "<i>SN-002</i>", warrantyUntil: "2001-01-31" },
+      ],
+    },
+  });
+  assert.equal(made.status, 201);
+  const [one, two] = await made.json();
+  assert.notEqual(one.slug, two.slug);
+  assert.notEqual(one.slug, parent.slug);
+
+  const service = await request(`${path}/items/${one.id}/service`, {
+    method: "POST",
+    body: { date: "2026-02-10", note: "Replaced the filter" },
+  });
+  assert.equal((await service.json()).service.length, 1);
+  assert.equal(
+    (await request(`${path}/items/${one.id}/service`, { method: "POST", body: { date: "x", note: "n" } })).status,
+    400,
+  );
+
+  const pageOne = await (await fetch(`${base}/r/${one.slug}`)).text();
+  assert.match(pageOne, /Your kettle/); // template content
+  assert.match(pageOne, /Kettle #1/);
+  assert.match(pageOne, /SN-001/);
+  assert.match(pageOne, /Active until 31 Jan 2099/);
+  assert.match(pageOne, /Replaced the filter/);
+  const pageTwo = await (await fetch(`${base}/r/${two.slug}`)).text();
+  assert.match(pageTwo, /Expired on 31 Jan 2001/);
+  assert.match(pageTwo, /No service recorded yet/);
+  assert.match(pageTwo, /&lt;i&gt;SN-002/); // item text is escaped
+  assert.doesNotMatch(pageTwo, /Replaced the filter/); // history is per item
+
+  // Editing the template changes every item page at once.
+  await request(`${path}/draft`, {
+    method: "PUT",
+    body: { title: "Kettle", blocks: tpl.map((b) => (b.id === "head1" ? { ...b, text: "Your kettle, updated" } : b)) },
+  });
+  await request(`${path}/publish`, { method: "POST", body: {} });
+  assert.match(await (await fetch(`${base}/r/${two.slug}`)).text(), /Your kettle, updated/);
+
+  // Actions on an item page count for the item and roll up into the template.
+  const ticket = ticketOf(pageOne);
+  await fetch(`${base}/r/${one.slug}/go/btn01?ticket=${ticket}`, { redirect: "manual" });
+  await post(base, `/r/${one.slug}/submit/form1`, { ticket, f_q1: "owner@example.com" });
+  const responses = await (await request(`${path}/submissions`)).json();
+  assert.equal(responses.length, 1);
+  assert.equal(responses[0].item, "Kettle #1");
+  assert.match(await (await request(`${path}/submissions.csv`)).text(), /Kettle #1/);
+  const stats = await (await request(`${path}/stats`)).json();
+  assert.equal(stats.submissions, 1);
+  assert.equal(stats.taps, 1);
+  assert.equal(stats.scans, 3); // two item scans plus the update check above
+
+  // Items cannot be treated as templates, and cannot nest.
+  assert.equal((await request(`/api/codes/${one.id}/experience/draft`)).status, 400);
+  assert.equal((await request(`/api/codes/${one.id}/experience/items`, { method: "POST", body: { items: [{ name: "x" }] } })).status, 400);
+
+  // Editing an item and removing one.
+  const renamed = await request(`${path}/items/${two.id}`, {
+    method: "PUT",
+    body: { name: "Kettle #2b", serial: "SN-002", warrantyUntil: "" },
+  });
+  assert.equal((await renamed.json()).name, "Kettle #2b");
+  await request(`${path}/items/${two.id}`, { method: "DELETE" });
+  assert.equal((await fetch(`${base}/r/${two.slug}`)).status, 404);
+  const items = await (await request(`${path}/items`)).json();
+  assert.equal(items.length, 1);
+
+  // Deleting the template removes its item pages with it.
+  await request(`/api/codes/${parent.id}`, { method: "DELETE" });
+  assert.equal((await fetch(`${base}/r/${one.slug}`)).status, 404);
+  assert.equal((await (await request("/api/codes")).json()).filter((c) => c.name.startsWith("Kettle")).length, 0);
+});

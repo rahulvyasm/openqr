@@ -14,6 +14,7 @@ import {
   Link2,
   Clock,
   Loader2,
+  Package,
   MousePointerClick,
   Plus,
   RotateCcw,
@@ -32,6 +33,7 @@ import {
   type Role,
 } from "../lib";
 import Modal from "./Modal";
+import ExperienceItems from "./ExperienceItems";
 import { AssetPicker, type AssetFilter } from "./MediaLibrary";
 
 type Field = {
@@ -55,6 +57,7 @@ type Version = {
   author: string | null;
 };
 type Submission = {
+  item?: string;
   id: number;
   form: string;
   answers: Record<string, string>;
@@ -104,6 +107,7 @@ const palette = [
   ["links", "Links", Link2],
   ["file", "File", FileText],
   ["form", "Form", ClipboardList],
+  ["item", "Item details", Package],
 ] as const;
 const blockName = Object.fromEntries(palette.map(([k, n]) => [k, n])) as Record<
   string,
@@ -126,6 +130,8 @@ const blank = (type: string): Block => {
       return { id, type, items: [{ label: "Link", url: "https://" }] };
     case "file":
       return { id, type, assetId: "", label: "Download" };
+    case "item":
+      return { id, type, title: "About this item" };
     default:
       return {
         id,
@@ -150,6 +156,7 @@ const summary = (b: Block) => {
     case "button":
       return s("label");
     case "form":
+    case "item":
       return s("title");
     case "file":
       return s("label");
@@ -514,6 +521,16 @@ function FieldEditor({
         </>
       );
     }
+    case "item":
+      return (
+        <>
+          {str("title", "Heading", { maxLength: 80 })}
+          <p className="hint">
+            Shows each item&apos;s name, serial, warranty and service history. Add
+            items in the Items tab.
+          </p>
+        </>
+      );
     default: {
       const fields = block.fields as Field[];
       const set = (i: number, patch: Partial<Field>) =>
@@ -638,7 +655,9 @@ export default function ExperienceStudio({
 }) {
   const editable = mayEdit(role);
   const [draft, setDraft] = useState<Draft | null>(null);
-  const [tab, setTab] = useState<"build" | "responses" | "results" | "history">(
+  const [tab, setTab] = useState<
+    "build" | "items" | "responses" | "results" | "history"
+  >(
     "build",
   );
   const [open, setOpen] = useState<string | null>(null);
@@ -796,6 +815,7 @@ export default function ExperienceStudio({
 
   const tabs = [
     ["build", "Build", Type],
+    ["items", "Items", Package],
     ["responses", "Responses", Inbox],
     ["results", "Results", BarChart3],
     ["history", "History", History],
@@ -1039,7 +1059,10 @@ export default function ExperienceStudio({
               {subs.map((s) => (
                 <li key={s.id} className={s.read ? "" : "new"}>
                   <div>
-                    <strong>{s.form}</strong>
+                    <strong>
+                      {s.form}
+                      {s.item ? ` · ${s.item}` : ""}
+                    </strong>
                     <time>{new Date(s.createdAt).toLocaleString()}</time>
                   </div>
                   <dl>
@@ -1110,6 +1133,10 @@ export default function ExperienceStudio({
               <Loader2 className="spin" />
             )}
           </div>
+        )}
+
+        {tab === "items" && (
+          <ExperienceItems codeId={code.id} editable={editable} />
         )}
 
         {tab === "history" && (

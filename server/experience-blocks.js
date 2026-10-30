@@ -93,6 +93,11 @@ export const blockSchema = z.discriminatedUnion("type", [
   }),
   z.object({
     ...base,
+    type: z.literal("item"),
+    title: text(80).min(1),
+  }),
+  z.object({
+    ...base,
     type: z.literal("form"),
     title: text(100).min(1),
     intro: text(300).default(""),
@@ -235,7 +240,7 @@ const css = (p) => {
   const accent = p.accent || "#285b48",
     dark = p.theme === "bold",
     radius = p.corners === "square" ? "0" : "16px";
-  return `*{box-sizing:border-box}body{margin:0;min-height:100vh;font:16px/1.65 ${p.font === "serif" ? "Georgia,serif" : "system-ui,-apple-system,Segoe UI,sans-serif"};color:${dark ? "#fff" : "#1f2d26"};background:${dark ? accent : p.theme === "minimal" ? "#fff" : "#f0f3ec"};padding:28px 16px}main{max-width:480px;margin:auto;display:grid;gap:16px}.xp-card{background:${dark ? "#ffffff14" : "#fff"};border:1px solid ${dark ? "#ffffff30" : "#e4eadc"};border-radius:${radius};padding:22px;overflow:hidden}h1{font-size:32px;line-height:1.15;letter-spacing:-1px;margin:4px 0 6px;overflow-wrap:anywhere}h2{font-size:20px;letter-spacing:-.4px;margin:0 0 6px}p{margin:0;white-space:pre-line;overflow-wrap:anywhere;color:${dark ? "#ffffffcc" : "#5d6b63"}}.xp-sub{font-size:15px}.xp-image,.xp-video{display:block;width:100%;border-radius:${radius};background:#0001}.xp-image{height:auto}figure{margin:0}figcaption{font-size:13px;color:${dark ? "#ffffffb0" : "#7d8b82"};padding-top:8px}.xp-btn{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:16px 18px;border-radius:${radius === "0" ? "0" : "14px"};text-decoration:none;font-weight:600;font-size:15px;border:1.5px solid ${dark ? "#fff" : accent};color:${p.buttonStyle === "solid" && !dark ? "#fff" : dark ? accent : accent};background:${p.buttonStyle === "solid" && !dark ? accent : dark ? "#fff" : "transparent"}}.xp-stack{display:grid;gap:10px}label{display:grid;gap:6px;font-size:14px;font-weight:600;margin-top:14px}input,textarea,select{font:inherit;font-weight:400;padding:12px 14px;border:1px solid #cfd8c8;border-radius:${radius === "0" ? "0" : "10px"};background:#fff;color:#1f2d26;width:100%}textarea{min-height:96px;resize:vertical}.xp-rate{display:flex;gap:8px;margin-top:6px}.xp-rate label{margin:0;flex:1;position:relative}.xp-rate input{position:absolute;opacity:0}.xp-rate span{display:block;text-align:center;padding:12px 0;border:1px solid #cfd8c8;border-radius:10px;background:#fff;color:#1f2d26}.xp-rate input:checked+span{background:${accent};color:#fff;border-color:${accent}}.xp-rate input:focus-visible+span{outline:2px solid ${accent};outline-offset:2px}button.xp-send{margin-top:18px;width:100%;padding:15px;border:0;border-radius:${radius === "0" ? "0" : "12px"};background:${dark ? "#fff" : accent};color:${dark ? accent : "#fff"};font:600 15px inherit;font-family:inherit;cursor:pointer}.xp-note{padding:12px 14px;border-radius:10px;margin-top:14px;font-size:14px}.xp-ok{background:#e4f6e9;color:#1d5a32}.xp-err{background:#fde8e6;color:#8a2a22}.xp-trap{position:absolute;left:-9999px;height:0;overflow:hidden}.xp-foot{text-align:center;font-size:12px;color:${dark ? "#ffffff99" : "#9aa690"};padding:10px 0 4px}a:focus-visible,button:focus-visible{outline:2px solid ${accent};outline-offset:3px}`;
+  return `*{box-sizing:border-box}body{margin:0;min-height:100vh;font:16px/1.65 ${p.font === "serif" ? "Georgia,serif" : "system-ui,-apple-system,Segoe UI,sans-serif"};color:${dark ? "#fff" : "#1f2d26"};background:${dark ? accent : p.theme === "minimal" ? "#fff" : "#f0f3ec"};padding:28px 16px}main{max-width:480px;margin:auto;display:grid;gap:16px}.xp-card{background:${dark ? "#ffffff14" : "#fff"};border:1px solid ${dark ? "#ffffff30" : "#e4eadc"};border-radius:${radius};padding:22px;overflow:hidden}h1{font-size:32px;line-height:1.15;letter-spacing:-1px;margin:4px 0 6px;overflow-wrap:anywhere}h2{font-size:20px;letter-spacing:-.4px;margin:0 0 6px}p{margin:0;white-space:pre-line;overflow-wrap:anywhere;color:${dark ? "#ffffffcc" : "#5d6b63"}}.xp-sub{font-size:15px}.xp-image,.xp-video{display:block;width:100%;border-radius:${radius};background:#0001}.xp-image{height:auto}figure{margin:0}figcaption{font-size:13px;color:${dark ? "#ffffffb0" : "#7d8b82"};padding-top:8px}.xp-btn{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:16px 18px;border-radius:${radius === "0" ? "0" : "14px"};text-decoration:none;font-weight:600;font-size:15px;border:1.5px solid ${dark ? "#fff" : accent};color:${p.buttonStyle === "solid" && !dark ? "#fff" : dark ? accent : accent};background:${p.buttonStyle === "solid" && !dark ? accent : dark ? "#fff" : "transparent"}}.xp-stack{display:grid;gap:10px}label{display:grid;gap:6px;font-size:14px;font-weight:600;margin-top:14px}input,textarea,select{font:inherit;font-weight:400;padding:12px 14px;border:1px solid #cfd8c8;border-radius:${radius === "0" ? "0" : "10px"};background:#fff;color:#1f2d26;width:100%}textarea{min-height:96px;resize:vertical}.xp-rate{display:flex;gap:8px;margin-top:6px}.xp-rate label{margin:0;flex:1;position:relative}.xp-rate input{position:absolute;opacity:0}.xp-rate span{display:block;text-align:center;padding:12px 0;border:1px solid #cfd8c8;border-radius:10px;background:#fff;color:#1f2d26}.xp-rate input:checked+span{background:${accent};color:#fff;border-color:${accent}}.xp-rate input:focus-visible+span{outline:2px solid ${accent};outline-offset:2px}button.xp-send{margin-top:18px;width:100%;padding:15px;border:0;border-radius:${radius === "0" ? "0" : "12px"};background:${dark ? "#fff" : accent};color:${dark ? accent : "#fff"};font:600 15px inherit;font-family:inherit;cursor:pointer}.xp-note{padding:12px 14px;border-radius:10px;margin-top:14px;font-size:14px}.xp-ok{background:#e4f6e9;color:#1d5a32}.xp-err{background:#fde8e6;color:#8a2a22}.xp-item dl{margin:14px 0 0;display:grid;gap:8px}.xp-item dl div{display:flex;justify-content:space-between;gap:12px}.xp-item dt{color:#7d8b82;font-size:14px}.xp-item dd{margin:0;font-weight:600;text-align:right;overflow-wrap:anywhere}.xp-item h3{font-size:15px;margin:20px 0 6px}.xp-item ul{list-style:none;margin:0;padding:0;display:grid;gap:8px}.xp-item li{display:grid;gap:2px;padding:10px 12px;border-radius:10px;background:#0000000a}.xp-item time{font-size:12px;color:#7d8b82}.xp-trap{position:absolute;left:-9999px;height:0;overflow:hidden}.xp-foot{text-align:center;font-size:12px;color:${dark ? "#ffffff99" : "#9aa690"};padding:10px 0 4px}a:focus-visible,button:focus-visible{outline:2px solid ${accent};outline-offset:3px}`;
 };
 
 export function renderExperience(
@@ -248,6 +253,7 @@ export function renderExperience(
     preview = false,
     now = new Date(),
     zone = "UTC",
+    item = null,
   } = {},
 ) {
   const go = (blockId, index = 0) =>
@@ -269,8 +275,40 @@ export function renderExperience(
       f.type === "email" ? "email" : f.type === "phone" ? "tel" : "text";
     return `<label>${xml(f.label)}${f.required ? " *" : ""}<input type="${kind}" name="${name}" maxlength="500" value="${value}"${req}></label>`;
   };
+  const day = (value) => {
+    const d = new Date(`${value}T00:00:00Z`);
+    return Number.isNaN(+d)
+      ? ""
+      : d.toLocaleDateString("en-GB", {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+          timeZone: "UTC",
+        });
+  };
+  const renderItem = (b) => {
+    // Without an item (the template itself) a sample shows how the page will look.
+    const sample = !item,
+      data = item || {
+        name: "Sample item",
+        serial: "SN-0001",
+        warrantyUntil: new Date(now.getTime() + 200 * 86400000)
+          .toISOString()
+          .slice(0, 10),
+        history: [{ date: new Date(now).toISOString().slice(0, 10), note: "Example service entry" }],
+      };
+    const today = now.toISOString().slice(0, 10);
+    const warranty = data.warrantyUntil
+      ? data.warrantyUntil >= today
+        ? `Active until ${day(data.warrantyUntil)}`
+        : `Expired on ${day(data.warrantyUntil)}`
+      : "";
+    return `<div class="xp-card xp-item"><h2>${xml(b.title)}</h2>${sample ? '<p class="xp-sub">Example details. Each item shows its own.</p>' : ""}<dl><div><dt>Item</dt><dd>${xml(data.name)}</dd></div>${data.serial ? `<div><dt>Serial</dt><dd>${xml(data.serial)}</dd></div>` : ""}${warranty ? `<div><dt>Warranty</dt><dd>${xml(warranty)}</dd></div>` : ""}</dl><h3>Service history</h3>${data.history.length ? `<ul>${data.history.map((h) => `<li><time>${xml(day(h.date))}</time><span>${xml(h.note)}</span></li>`).join("")}</ul>` : "<p>No service recorded yet.</p>"}</div>`;
+  };
   const renderBlock = (b) => {
     switch (b.type) {
+      case "item":
+        return renderItem(b);
       case "heading":
         return `<div class="xp-card"><h1>${xml(b.text)}</h1>${b.subtext ? `<p class="xp-sub">${xml(b.subtext)}</p>` : ""}</div>`;
       case "text":
@@ -324,6 +362,7 @@ export function templates() {
           text: "Meet your new product",
           subtext: "Everything you need to get started, in one place.",
         },
+        { id: ids(), type: "item", title: "Your product" },
         {
           id: ids(),
           type: "text",

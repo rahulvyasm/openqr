@@ -1438,7 +1438,7 @@ export default function App() {
                                     className="dropdown"
                                     onClick={(e) => e.stopPropagation()}
                                   >
-                                    {code.type === "experience" && (
+                                    {code.type === "experience" && !code.data.itemOf && (
                                       <button
                                         onClick={() => {
                                           setStudio(code);

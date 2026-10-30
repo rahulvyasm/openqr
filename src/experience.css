@@ -506,3 +506,86 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+.xs-intro {
+  margin: 0;
+  color: var(--dim);
+  font-size: 14px;
+  line-height: 1.55;
+  max-width: 70ch;
+}
+.xs-items-add {
+  display: grid;
+  gap: 10px;
+  justify-items: start;
+}
+.xs-items-add label {
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+  width: 100%;
+}
+.xs-items li {
+  grid-template-columns: minmax(0, 1fr);
+}
+.xs-item-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.xs-item-head > small {
+  color: var(--dim);
+  font: 400 12px var(--font-mono);
+  white-space: nowrap;
+}
+.xs-item-edit {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.xs-item-edit label {
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+}
+.xs-row-actions {
+  display: flex;
+  gap: 8px;
+}
+.xs-service {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.xs-service li {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 8px 10px;
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+}
+.xs-service time {
+  font: 400 12px var(--font-mono);
+  color: var(--dim);
+  flex-shrink: 0;
+}
+.xs-service span {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.xs-service-add {
+  display: grid;
+  grid-template-columns: 160px minmax(0, 1fr) auto;
+  gap: 8px;
+}
+@media (max-width: 860px) {
+  .xs-item-head {
+    flex-wrap: wrap;
+  }
+  .xs-item-edit,
+  .xs-service-add {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

@@ -8,6 +8,7 @@ import { normalizeDesign, imageFor } from "./design.js";
 import { linksPage, hostedPage, unavailablePage } from "./pages.js";
 import { hostedTypes } from "./publishing.js";
 import { renderExperience, parseBlocks } from "./experience-blocks.js";
+import { resolveExperience } from "./experience-items.js";
 import { referencedAssets, validateAssetReferences } from "./storage.js";
 import {
   availability,
@@ -112,6 +113,14 @@ export function registerCodeRoutes(
         "SELECT c.*,(SELECT COUNT(*) FROM scans WHERE code_id=c.id) AS scans FROM codes c WHERE c.id=? AND c.workspace_id=?",
       )
       .get(id, workspaceId);
+  // Item pages belong to their template and go with it.
+  const dropItems = (row) =>
+    row.type === "experience" &&
+    db
+      .prepare(
+        "DELETE FROM codes WHERE workspace_id=? AND type='experience' AND json_extract(data,'$.itemOf')=?",
+      )
+      .run(row.workspace_id, row.id);
   const ownedCodes = (ids, workspaceId) =>
     ids.map((id) => {
       const row = getCode(id, workspaceId);
@@ -273,8 +282,10 @@ export function registerCodeRoutes(
       throw invalid("Folder not found.");
     transaction(db, () => {
       for (const row of rows) {
-        if (input.action === "delete")
+        if (input.action === "delete") {
+          dropItems(row);
           db.prepare("DELETE FROM codes WHERE id=?").run(row.id);
+        }
         else if (input.action === "move")
           db.prepare("UPDATE codes SET folder_id=? WHERE id=?").run(
             input.folderId || null,
@@ -433,6 +444,7 @@ export function registerCodeRoutes(
     const row = getCode(req.params.id, req.workspace.id);
     if (!row) throw invalid("QR code not found.", 404);
     transaction(db, () => {
+      dropItems(row);
       db.prepare("DELETE FROM codes WHERE id=? AND workspace_id=?").run(
         req.params.id,
         req.workspace.id,
@@ -635,7 +647,20 @@ export function registerCodeRoutes(
     if (result.code.type === "links")
       return res.type("html").send(linksPage(result.code));
     if (result.code.type === "experience") {
-      const c = result.code,
+      const resolved = resolveExperience(
+        db,
+        db.prepare("SELECT * FROM codes WHERE id=?").get(result.code.id),
+      );
+      if (!resolved)
+        return res
+          .status(404)
+          .type("html")
+          .send(unavailablePage("This page is no longer available."));
+      const c = {
+          ...result.code,
+          data: resolved.data,
+          pageOptions: resolved.pageOptions,
+        },
         ticket = publicTicket(c.id, analyticsSalt, 25),
         mediaUrl = (id) =>
           `/r/${encodeURIComponent(c.slug)}/media/${encodeURIComponent(id)}?ticket=${encodeURIComponent(ticket)}`;
@@ -648,7 +673,7 @@ export function registerCodeRoutes(
             pageOptions: c.pageOptions,
             ticket,
           },
-          { mediaUrl, zone: c.data.timeZone || "UTC" },
+          { mediaUrl, zone: c.data.timeZone || "UTC", item: resolved.item },
         ),
       );
     }
@@ -692,6 +717,11 @@ export function registerCodeRoutes(
       .get(req.params.slug);
     if (!row) throw invalid("QR page not found.", 404);
     const code = serialize(row);
+    if (code.type === "experience") {
+      const resolved = resolveExperience(db, row);
+      if (!resolved) throw invalid("QR page not found.", 404);
+      code.data = resolved.data;
+    }
     if (!validPublicTicket(req.query.ticket, code.id, analyticsSalt))
       throw invalid("Open this QR page again to access its files.", 403);
     const blocked = availability(code, { ignoreCap: true });

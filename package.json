@@ -13,6 +13,8 @@
     "start": "node server/index.js",
     "test": "node --test test/*.test.js",
     "test:recovery": "node --test test/recovery.test.js",
+    "test:visual": "npm run build && playwright test",
+    "test:visual:update": "npm run build && playwright test --update-snapshots",
     "format": "prettier --write src server shared scripts test *.json *.ts *.md *.yaml .github/workflows/*.yml",
     "recover": "node server/manage.js",
     "operator": "node server/operator-cli.js",
@@ -50,6 +52,7 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.1",
     "@types/node": "^26.6.5",
     "@types/papaparse": "^5.5.2",
     "@types/qrcode": "^1.5.6",

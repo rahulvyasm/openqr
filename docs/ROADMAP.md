@@ -114,7 +114,7 @@ The supplied QRCG screens also show coupons, feedback/ratings, and GS1 2D barcod
 
 - More adaptive rules beyond time of day (language, device, scan count).
 - Webhook alerts for form submissions (email alerts shipped).
-- Per-item connected pages (product or asset with its own page, service history and warranty).
+- Item pages: CSV import for large batches, a printable label sheet, and a public "report a problem" shortcut prefilled with the serial.
 - AI-drafted experiences from a short brief (needs a provider decision and key handling).
 - Drag-and-drop block ordering, a block for maps and hours, and file uploads inside forms.
-- Browser-level visual tests for Experience Studio and the public page.
+- Visual tests for the rest of the app (dashboard, settings, control room) and a Linux baseline set for CI.

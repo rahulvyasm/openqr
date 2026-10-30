@@ -205,7 +205,14 @@ export function createApp({
     });
   });
   registerCodeRoutes(app, db, origin, analyticsSalt, storage, entitlements);
-  registerExperienceRoutes(app, db, origin, analyticsSalt, alerts);
+  registerExperienceRoutes(
+    app,
+    db,
+    origin,
+    analyticsSalt,
+    alerts,
+    entitlements,
+  );
   app.get("/api/folders", (req, res) =>
     res.json(
       db
