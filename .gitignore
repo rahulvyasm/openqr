@@ -11,3 +11,5 @@ public/pdfjs/
 .visual-data/
 test-results/
 playwright-report/
+dist-lite/
+.shot*.mjs

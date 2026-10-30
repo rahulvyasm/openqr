@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Add a static **lite site**: a free in-browser QR generator (ten static code types, the full designer, PNG and SVG downloads, nothing uploaded) and a **See full potential** button that opens the real app against an in-browser mock server for an interactive demo. Includes an optional Supabase-backed early-access list, deployment files for Vercel, Cloudflare Pages and Netlify, browser tests (`npm run test:e2e`) and a CI job. See `docs/LITE_SITE.md`.
+
 ## 1.0.0 — 2026-10-30
 
 - Add **Experiences**: hosted pages built from blocks (heading, text, image, video, button, links, file, form, item details). Draft, publish and restore with up to 50 kept versions; a live phone preview; four starters (product companion, event welcome, business enquiry, guest feedback).

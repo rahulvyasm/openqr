@@ -148,6 +148,10 @@ export type Analytics = {
   referrers: Record<string, number>;
   topCodes: { id: string; name: string; scans: number }[];
 };
+// The browser demo installs these so the real screens run without a server.
+export const demoHooks: {
+  upload?: (file: File, kind?: "logo") => Promise<Asset>;
+} = {};
 export async function api<T>(
   path: string,
   body?: unknown,

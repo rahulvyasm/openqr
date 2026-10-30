@@ -34,8 +34,13 @@ Open <http://localhost:3001>, create the owner account, and make your first code
 | ![Experience on a phone](docs/experience-mobile.jpg) | ![Item page on a phone](docs/item-mobile.jpg) |
 | _A published experience on a phone._ | _An item page: the same template with this item's own serial, warranty and history._ |
 
+## Free generator and live demo
+
+A static, server-free version lives in this repository too: a free in-browser QR generator and a **See full potential** button that opens the real app on a mock server, so people can try everything without signing up. It deploys to any static host. See [docs/LITE_SITE.md](docs/LITE_SITE.md).
+
 ## Documentation
 
+- [Free generator and demo site](docs/LITE_SITE.md)
 - [Operations runbook](docs/RUNBOOK.md) and [postmortem template](docs/POSTMORTEM_TEMPLATE.md)
 - [Production readiness checklist](docs/PRODUCTION_READINESS.md)
 - [Roadmap](docs/ROADMAP.md), [changelog](CHANGELOG.md), [security policy](SECURITY.md), [contributing](CONTRIBUTING.md)

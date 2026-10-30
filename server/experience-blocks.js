@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { xml } from "../shared/qr.js";
-import { problem } from "./security.js";
+// Local copy so this file also runs in the browser (the demo renders pages client side).
+const problem = (message, status = 400) =>
+  Object.assign(new Error(message), { domain: true, status });
 
 /*
  * An experience is an ordered list of blocks stored as JSON in data.blocks.

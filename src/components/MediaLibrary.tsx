@@ -12,7 +12,7 @@ import {
   Video,
   X,
 } from "lucide-react";
-import { api, type Asset } from "../lib";
+import { api, demoHooks, type Asset } from "../lib";
 import Modal from "./Modal";
 export type AssetFilter = "pdf" | "image" | "logo" | "audio" | "video";
 export type StorageSummary = {
@@ -36,6 +36,7 @@ export async function uploadAsset(
   onProgress?: (percent: number) => void,
   signal?: AbortSignal,
 ): Promise<Asset> {
+  if (demoHooks.upload) return demoHooks.upload(file, kind);
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open("POST", `/api/assets${kind ? "?kind=logo" : ""}`);
