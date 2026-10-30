@@ -139,8 +139,20 @@ function wipe(el: HTMLElement) {
   );
 }
 
+// Screens that predate the data attributes still get the same treatment.
+const autoReveal = [
+  ".settings-panel",
+  ".operator-card",
+  ".operator-metrics > *",
+  ".design-gallery-card",
+  ".plan-card",
+  ".asset-browser",
+  ".code-row",
+  ".campaign-pulse",
+].join(",");
+
 const handlers: [string, (el: HTMLElement) => void | (() => void)][] = [
-  ["[data-reveal]", reveal],
+  [`[data-reveal], ${autoReveal}`, reveal],
   ["[data-stagger]", stagger],
   ["[data-count]", count],
   ["[data-wipe]", wipe],

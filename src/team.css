@@ -157,8 +157,8 @@
   color: #93a77b;
 }
 .role-badge.owner {
-  color: #9b8d54;
-  background: #f8f4e8;
+  color: #b3a672;
+  background: #151e1a;
   border-color: #262c2a;
 }
 .role-badge.admin {
@@ -229,8 +229,8 @@
   border: 1px solid #262c2a;
   border-radius: 5px;
   padding: 7px 10px;
-  color: #8ca474;
-  background: #fcfdf9;
+  color: #74a48c;
+  background: #101715;
 }
 .transfer-trigger {
   margin-top: 17px;
@@ -307,7 +307,7 @@
   border: 1px solid #262c2a;
   border-radius: 6px;
   font-size: 10px;
-  background: #fbfdf8;
+  background: #111815;
   color: #8ea67a;
 }
 .invite-link button {

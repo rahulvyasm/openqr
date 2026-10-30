@@ -337,7 +337,7 @@ textarea::placeholder {
 .topbar {
   height: 71px;
   border-bottom: 1px solid var(--line);
-  background: #fcfdf9;
+  background: #101715;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -486,11 +486,11 @@ textarea::placeholder {
   color: #7cad94;
 }
 .peach {
-  background: #fbefe4;
-  color: #b28b60;
+  background: #151e1b;
+  color: #af8e6a;
 }
 .lavender {
-  background: #f0edf9;
+  background: #141c19;
   color: #9c8db7;
 }
 .status-dot {
@@ -700,7 +700,7 @@ textarea::placeholder {
 .empty-state {
   text-align: center;
   padding: 32px 20px 29px;
-  background: linear-gradient(180deg, #fcfdf9, #121715);
+  background: linear-gradient(180deg, #101715, #121715);
   border: 1px dashed #262c2a;
   border-top: 0;
   border-radius: 0 0 10px 10px;
@@ -898,8 +898,8 @@ textarea::placeholder {
   border-radius: 50%;
 }
 .code-status.paused {
-  color: #b18d57;
-  background: #fcf3e4;
+  color: #af936a;
+  background: #151e1a;
   border-color: #f3e6ce;
 }
 .code-status.paused > span {
@@ -1342,9 +1342,9 @@ select:disabled {
 }
 .form-error {
   font-size: 11px;
-  color: #b16858;
+  color: #af766a;
   line-height: 1.6;
-  background: #fcf3ef;
+  background: #131a18;
   padding: 10px;
   border-radius: 5px;
   margin-bottom: 12px;
@@ -1408,7 +1408,7 @@ dd {
   line-height: 1.8;
 }
 .info-note.amber {
-  background: #fcf6e9;
+  background: #141c19;
   color: #ac996e;
 }
 .toast {
@@ -1577,7 +1577,7 @@ dd {
   align-items: center;
   justify-content: center;
   position: relative;
-  background: #fcfdf9;
+  background: #101715;
   padding: 55px 40px 90px;
 }
 .auth-form-wrap {

@@ -194,10 +194,10 @@
 .inline-warning {
   font-size: 10px;
   line-height: 1.7;
-  background: #fbf3e5;
+  background: #151e1a;
   border: 1px solid #efe4cc;
   border-radius: 6px;
-  color: #ad9467;
+  color: #af966a;
   padding: 10px;
   margin: 0 0 17px;
 }
@@ -680,11 +680,11 @@
 }
 .batch-actions select {
   border: 1px solid #262c2a;
-  background: #f9fcf5;
+  background: #111916;
   padding: 6px;
   border-radius: 5px;
   font-size: 9px;
-  color: #879f6d;
+  color: #75a48c;
   max-width: 130px;
 }
 .batch-actions button {

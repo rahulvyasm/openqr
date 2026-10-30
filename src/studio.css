@@ -431,7 +431,7 @@ kbd {
 }
 .sketchpad-paper {
   padding: 11px 11px 9px;
-  background: #fcfff5;
+  background: #111815;
   border-radius: 5px;
   box-shadow: 12px 15px 0 #101d1760;
   transform: rotate(-7deg);
@@ -929,7 +929,7 @@ kbd {
   transition: background 0.2s;
 }
 .code-row:hover {
-  background: #fcfdf8;
+  background: #111815;
 }
 .code-name h3 {
   font-size: 14px;
@@ -1075,9 +1075,9 @@ kbd {
 }
 .type-option.active,
 .type-option.selected {
-  background: #edf5dc;
+  background: #18221e;
   border-color: #9fb875;
-  color: #3d5828;
+  color: #b7d8c7;
 }
 .design-gallery-card {
   border-radius: 8px;
@@ -1214,7 +1214,7 @@ kbd {
   margin-top: 4px;
 }
 .command-results button.is-active {
-  background: #edf4de;
+  background: #18221e;
 }
 .command-results > p {
   font-size: 12px;
@@ -1802,7 +1802,7 @@ kbd {
 }
 .profile-menu > button:hover,
 .profile-menu > button:focus-visible {
-  background: #edf4de;
+  background: #18221e;
 }
 .profile-menu > button:last-child {
   border-top: 1px solid #262c2a;
@@ -1898,8 +1898,8 @@ kbd {
   min-height: 43px;
   border: 1px solid #262c2a;
   padding: 10px 12px;
-  background: #fafff0;
-  color: #304723;
+  background: #121917;
+  color: #c4dfd2;
   border-radius: 6px;
   font-size: 12px;
   text-align: left;
@@ -1933,7 +1933,7 @@ kbd {
 .role-select-options > button:hover,
 .role-select-options > button:focus-visible,
 .role-select-options > button[aria-selected="true"] {
-  background: #eef6df;
+  background: #17211d;
 }
 .role-select-options > button > span {
   flex: 1;
@@ -2229,8 +2229,8 @@ kbd {
   flex-shrink: 0;
 }
 .operator-event-mark.warning {
-  background: #fff4e6;
-  color: #ab8050;
+  background: #141c19;
+  color: #af8f6b;
   border-color: #262c2a;
 }
 .operator-feed article > div {
@@ -2524,13 +2524,13 @@ kbd {
   gap: 10px;
   padding: 13px;
   border: 1px solid #262c2a;
-  background: #fbfdf7;
+  background: #111815;
   border-radius: 5px;
   margin-bottom: 8px;
   cursor: pointer;
 }
 .staff-role-options > label:has(input:checked) {
-  background: #edf7dc;
+  background: #18211e;
   border-color: #a9c87c;
 }
 .staff-role-options input[type="radio"] {
@@ -2667,7 +2667,7 @@ kbd {
 }
 .plan-card.current {
   border-color: #9cbd6d;
-  background: #f6faed;
+  background: #131c19;
 }
 .plan-card h3 {
   font: 700 27px var(--font-display);
