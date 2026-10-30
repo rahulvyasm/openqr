@@ -114,7 +114,7 @@ The supplied QRCG screens also show coupons, feedback/ratings, and GS1 2D barcod
 
 - More adaptive rules beyond time of day (language, device, scan count).
 - Webhook alerts for form submissions (email alerts shipped).
-- Item pages: CSV import for large batches, a printable label sheet, and a public "report a problem" shortcut prefilled with the serial.
+- Item pages: label sheet size presets (Avery formats) and QR-only export for a whole batch.
 - AI-drafted experiences from a short brief (needs a provider decision and key handling).
 - Drag-and-drop block ordering, a block for maps and hours, and file uploads inside forms.
 - Visual tests for the rest of the app (dashboard, settings, control room) and a Linux baseline set for CI.

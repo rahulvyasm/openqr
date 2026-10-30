@@ -23,16 +23,24 @@ const KEEP_VERSIONS = 50;
 const RETENTION_DAYS = 365;
 const INBOX_LIMIT = 10000;
 
+export function purgeExpiredResponses(db, now = new Date()) {
+  return db.prepare(
+    "DELETE FROM experience_submissions WHERE created_at<=?",
+  ).run(new Date(+now - RETENTION_DAYS * 86400000).toISOString());
+}
+
 export function migrateExperiences(db) {
   db.exec(`
     CREATE TABLE IF NOT EXISTS experience_drafts (code_id TEXT PRIMARY KEY REFERENCES codes(id) ON DELETE CASCADE, title TEXT NOT NULL, blocks TEXT NOT NULL, updated_at TEXT NOT NULL, updated_by TEXT);
     CREATE TABLE IF NOT EXISTS experience_versions (id INTEGER PRIMARY KEY, code_id TEXT NOT NULL REFERENCES codes(id) ON DELETE CASCADE, version INTEGER NOT NULL, title TEXT NOT NULL, blocks TEXT NOT NULL, note TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL, created_by TEXT, UNIQUE(code_id,version));
     CREATE TABLE IF NOT EXISTS experience_submissions (id INTEGER PRIMARY KEY, code_id TEXT NOT NULL REFERENCES codes(id) ON DELETE CASCADE, block_id TEXT NOT NULL, form_title TEXT NOT NULL, answers TEXT NOT NULL, created_at TEXT NOT NULL, read_at TEXT);
     CREATE INDEX IF NOT EXISTS experience_submissions_code ON experience_submissions(code_id, created_at);
+    CREATE INDEX IF NOT EXISTS experience_submissions_date ON experience_submissions(created_at);
     CREATE TABLE IF NOT EXISTS experience_events (id INTEGER PRIMARY KEY, code_id TEXT NOT NULL REFERENCES codes(id) ON DELETE CASCADE, block_id TEXT NOT NULL, label TEXT NOT NULL, created_at TEXT NOT NULL);
     CREATE INDEX IF NOT EXISTS experience_events_code ON experience_events(code_id, created_at);
   `);
   migrateItems(db);
+  purgeExpiredResponses(db);
 }
 
 const csvCell = (value) => {
@@ -50,6 +58,10 @@ export function registerExperienceRoutes(
   entitlements,
 ) {
   const lastAlert = new Map();
+  app.use(["/api/codes/:id/experience", "/api/experience/unread"], (_req, _res, next) => {
+    purgeExpiredResponses(db);
+    next();
+  });
   registerItemRoutes(app, db, origin, entitlements);
   const owned = (req) => {
     const row = db
@@ -336,7 +348,7 @@ export function registerExperienceRoutes(
       submissions,
       taps,
       actions,
-      conversion: scans ? Math.min(1, (submissions + taps) / scans) : 0,
+      actionsPerScan: scans ? (submissions + taps) / scans : null,
       blocks: blocks.length,
     });
   });
@@ -505,17 +517,19 @@ export function registerExperienceRoutes(
         );
       // A filled honeypot looks like success so scripts get no signal.
       if (input.website) return page({ sent: block.id });
-      const result = formAnswers(block, input);
+      const result = formAnswers(block, input, row.resolved.item);
       if (result.error)
         return page({
           error: { block: block.id, message: result.error },
           values: input,
         });
-      if (!Object.keys(result.answers).length)
+      if (!result.filled)
         return page({
           error: { block: block.id, message: "Please fill in the form." },
           values: input,
         });
+      const now = new Date();
+      purgeExpiredResponses(db, now);
       const total = db
         .prepare("SELECT COUNT(*) n FROM experience_submissions WHERE code_id=?")
         .get(row.id).n;
@@ -526,17 +540,9 @@ export function registerExperienceRoutes(
             message: "This form is not accepting responses right now.",
           },
         });
-      const now = new Date();
       db.prepare(
         "INSERT INTO experience_submissions (code_id,block_id,form_title,answers,created_at) VALUES (?,?,?,?,?)",
       ).run(row.id, block.id, block.title, JSON.stringify(result.answers), now.toISOString());
-      // Responses are personal data, so they expire on their own.
-      db.prepare(
-        "DELETE FROM experience_submissions WHERE code_id=? AND created_at<?",
-      ).run(
-        row.id,
-        new Date(now - RETENTION_DAYS * 86400000).toISOString(),
-      );
       const to = notifier?.canEmail ? emails(data) : [];
       // One alert per page every ten minutes keeps a busy form from flooding inboxes.
       if (to.length && Date.now() - (lastAlert.get(row.id) || 0) > 600000) {

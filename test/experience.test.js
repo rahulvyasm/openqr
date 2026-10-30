@@ -38,6 +38,81 @@ const post = (base, path, fields) =>
     body: new URLSearchParams(fields).toString(),
   });
 
+test("repeated and special question labels retain every answer in the inbox and CSV", async (t) => {
+  const { request, setup, base } = await fixture(t);
+  await setup();
+  const labels = ["Name", "Name", "Name (2)", "__proto__"];
+  const repeated = {
+    ...form,
+    fields: labels.map((label, i) => ({ id: `q${i}`, label, type: "text", required: false, options: [] })),
+  };
+  const code = await (await create(request, {
+    data: { title: "Contact", blocks: JSON.stringify([repeated]) },
+  })).json();
+  const ticket = ticketOf(await (await fetch(`${base}/r/${code.slug}`)).text());
+  const response = await post(base, `/r/${code.slug}/submit/form1`, {
+    ticket, f_q0: "First", f_q1: "Second", f_q2: "Third", f_q3: "Fourth",
+  });
+  assert.equal(response.status, 200);
+  const path = `/api/codes/${code.id}/experience`;
+  const rows = await (await request(`${path}/submissions`)).json();
+  assert.deepEqual(rows[0].answers, JSON.parse('{"Name":"First","Name (3)":"Second","Name (2)":"Third","__proto__":"Fourth"}'));
+  const csv = await (await request(`${path}/submissions.csv`)).text();
+  assert.match(csv, /Name,Name \(3\),Name \(2\),__proto__/);
+  assert.match(csv, /First,Second,Third,Fourth/);
+  // The second question keeps its key if the first optional question is blank.
+  await post(base, `/r/${code.slug}/submit/form1`, { ticket, f_q1: "Only second" });
+  const next = await (await request(`${path}/submissions`)).json();
+  assert.deepEqual(next[0].answers, { "Name (3)": "Only second" });
+});
+
+test("actions per scan counts multiple actions honestly and handles zero scans", async (t) => {
+  const { request, setup, base } = await fixture(t);
+  await setup();
+  const code = await (await create(request)).json();
+  const path = `/api/codes/${code.id}/experience/stats`;
+  assert.equal((await (await request(path)).json()).actionsPerScan, null);
+  const ticket = ticketOf(await (await fetch(`${base}/r/${code.slug}`)).text());
+  for (let i = 0; i < 2; i++)
+    await fetch(`${base}/r/${code.slug}/go/btn01?ticket=${ticket}`, { redirect: "manual" });
+  await post(base, `/r/${code.slug}/submit/form1`, { ticket, f_q1: "ada@example.com" });
+  const stats = await (await request(path)).json();
+  assert.equal(stats.scans, 1);
+  assert.equal(stats.taps, 2);
+  assert.equal(stats.submissions, 1);
+  assert.equal(stats.actionsPerScan, 3);
+});
+
+test("expired responses are removed at startup, on reads and before full-inbox checks", async (t) => {
+  const { request, setup, base, db } = await fixture(t);
+  await setup();
+  const code = await (await create(request)).json();
+  const old = new Date(Date.now() - 366 * 86400000).toISOString();
+  const recent = new Date().toISOString();
+  const seed = (at, count = 1) => db.prepare(`
+    WITH RECURSIVE rows(n) AS (SELECT 1 UNION ALL SELECT n+1 FROM rows WHERE n<?)
+    INSERT INTO experience_submissions (code_id,block_id,form_title,answers,created_at)
+    SELECT ?, 'form1', 'Enquiry', '{"Email":"old@example.com"}', ? FROM rows
+  `).run(count, code.id, at);
+  seed(old);
+  seed(recent);
+  const { migrateExperiences } = await import("../server/experience.js");
+  migrateExperiences(db);
+  assert.equal(db.prepare("SELECT COUNT(*) n FROM experience_submissions").get().n, 1);
+  seed(old);
+  assert.equal((await (await request("/api/experience/unread")).json()).unread, 1);
+  seed(old);
+  const path = `/api/codes/${code.id}/experience`;
+  assert.doesNotMatch(await (await request(`${path}/submissions.csv`)).text(), new RegExp(old));
+  seed(old, 10000);
+  const ticket = ticketOf(await (await fetch(`${base}/r/${code.slug}`)).text());
+  const sent = await post(base, `/r/${code.slug}/submit/form1`, { ticket, f_q1: "new@example.com" });
+  assert.match(await sent.text(), /Thanks, we got it/);
+  const rows = await (await request(`${path}/submissions`)).json();
+  assert.equal(rows.length, 2);
+  assert.equal(rows[0].answers.Email, "new@example.com");
+});
+
 test("experiences render, track actions, collect responses and version", async (t) => {
   const { request, setup, base } = await fixture(t);
   await setup();
@@ -394,6 +469,7 @@ test("item pages share a template but keep their own details, history and respon
   assert.equal(stats.submissions, 1);
   assert.equal(stats.taps, 1);
   assert.equal(stats.scans, 3); // two item scans plus the update check above
+  assert.equal(stats.actionsPerScan, 2 / 3);
 
   // Items cannot be treated as templates, and cannot nest.
   assert.equal((await request(`/api/codes/${one.id}/experience/draft`)).status, 400);
@@ -415,3 +491,68 @@ test("item pages share a template but keep their own details, history and respon
   assert.equal((await fetch(`${base}/r/${one.slug}`)).status, 404);
   assert.equal((await (await request("/api/codes")).json()).filter((c) => c.name.startsWith("Kettle")).length, 0);
 });
+
+test("item pages offer a report shortcut and fill the serial automatically", async (t) => {
+  const { request, setup, base } = await fixture(t);
+  await setup();
+  const blocks = [
+    { id: "item1", type: "item", title: "Your kettle" },
+    {
+      id: "rep01",
+      type: "form",
+      title: "Report a problem",
+      intro: "",
+      submitLabel: "Send",
+      successMessage: "Thanks.",
+      fields: [
+        { id: "q1", label: "Serial number", type: "serial", required: false, options: [] },
+        { id: "q2", label: "What happened?", type: "textarea", required: true, options: [] },
+      ],
+    },
+  ];
+  const parent = await (
+    await create(request, { data: { title: "Kettle", blocks: JSON.stringify(blocks) } })
+  ).json();
+  const [item] = await (
+    await request(`/api/codes/${parent.id}/experience/items`, {
+      method: "POST",
+      body: { items: [{ name: "Kettle #7", serial: "SN-777" }] },
+    })
+  ).json();
+  const page = await (await fetch(`${base}/r/${item.slug}`)).text();
+  assert.match(page, /href="#b-rep01"/);
+  assert.match(page, /Report a problem/);
+  assert.match(page, /value="SN-777" readonly/);
+  const ticket = ticketOf(page);
+  // A forged serial is ignored; the page's own serial is stored.
+  await post(base, `/r/${item.slug}/submit/rep01`, { ticket, f_q1: "FORGED", f_q2: "It leaks" });
+  const [response] = await (
+    await request(`/api/codes/${parent.id}/experience/submissions`)
+  ).json();
+  assert.equal(response.answers["Serial number"], "SN-777");
+  // Only the serial is not a response.
+  const empty = await post(base, `/r/${item.slug}/submit/rep01`, { ticket });
+  assert.match(await empty.text(), /fill in/i);
+});
+
+test("printable labels list every item's QR, name and serial", async (t) => {
+  const { request, setup } = await fixture(t);
+  await setup();
+  const parent = await (await create(request)).json();
+  const path = `/api/codes/${parent.id}/experience/items`;
+  assert.equal((await request(`${path}/labels`)).status, 404);
+  await request(path, {
+    method: "POST",
+    body: { items: [{ name: "Box <1>", serial: "S-1" }, { name: "Box 2", serial: "S-2" }] },
+  });
+  const res = await request(`${path}/labels`);
+  assert.equal(res.status, 200);
+  const html = await res.text();
+  assert.equal((html.match(/<figure>/g) || []).length, 2);
+  assert.match(html, /Box &lt;1&gt;/);
+  assert.match(html, /S-2/);
+  assert.match(html, /<svg/);
+  assert.doesNotMatch(html, /<script/i);
+  assert.equal((await request(`/api/codes/${parent.id}/experience/items/labels`, { authenticated: false })).status, 401);
+});
+

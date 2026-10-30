@@ -589,3 +589,31 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+.xs-file {
+  position: relative;
+  cursor: pointer;
+}
+.xs-file input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+  width: 100%;
+}
+.xs-link {
+  border: 0;
+  background: none;
+  color: var(--acid);
+  text-decoration: underline;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+}
+.xs-items-add label.xs-file {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  width: auto;
+  font-size: 12px;
+}

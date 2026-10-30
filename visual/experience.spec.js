@@ -25,6 +25,18 @@ const blocks = [
       { id: "q3", label: "Rating", type: "rating", required: false, options: [] },
     ],
   },
+  {
+    id: "form2",
+    type: "form",
+    title: "Report a problem",
+    intro: "",
+    submitLabel: "Send report",
+    successMessage: "Report received.",
+    fields: [
+      { id: "q1", label: "Serial number", type: "serial", required: false, options: [] },
+      { id: "q2", label: "What happened?", type: "textarea", required: true, options: [] },
+    ],
+  },
 ];
 
 test.describe.configure({ mode: "serial" });
@@ -124,6 +136,14 @@ test.describe("studio", () => {
     await expect(studio(page)).toHaveScreenshot("studio-items.png", {
       mask: [page.locator('.xs-service-add input[type="date"]')],
     });
+  });
+
+  test("results explain actions per scan without a conversion percentage", async ({ page }) => {
+    await page.getByRole("tab", { name: "Results" }).click();
+    const metric = studio(page).locator(".xs-metrics > div").filter({ hasText: "Actions per scan" });
+    await expect(metric.locator("strong")).toHaveText("0.00");
+    await expect(studio(page).getByText(/includes repeat taps/)).toBeVisible();
+    await expect(studio(page).getByText("Action rate", { exact: true })).toHaveCount(0);
   });
 });
 

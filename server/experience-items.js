@@ -1,6 +1,8 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import { z } from "zod";
 import { audit, problem } from "./security.js";
+import { svgFor } from "./design.js";
+import { xml } from "../shared/qr.js";
 
 /*
  * Item pages: one experience is the template, and every physical item (a product, an
@@ -116,6 +118,29 @@ export function registerItemRoutes(app, db, origin, entitlements) {
     };
   };
 
+  // A print-ready sheet of labels: one QR, name and serial per item.
+  app.get("/api/codes/:id/experience/items/labels", (req, res) => {
+    const parent = template(req),
+      rows = db
+        .prepare(
+          "SELECT * FROM codes WHERE workspace_id=? AND type='experience' AND json_extract(data,'$.itemOf')=? ORDER BY created_at,rowid LIMIT 1000",
+        )
+        .all(req.workspace.id, parent.id);
+    if (!rows.length) throw problem("Add items before printing labels.", 404);
+    const cells = rows
+      .map((row) => {
+        const data = JSON.parse(row.data),
+          url = `${origin}/r/${row.slug}`;
+        return `<figure>${svgFor(url, JSON.parse(parent.design || "{}"), parent.color)}<figcaption><strong>${xml(data.title || row.name)}</strong>${data.serial ? `<span>${xml(data.serial)}</span>` : ""}<small>${xml(url.replace(/^https?:\/\//, ""))}</small></figcaption></figure>`;
+      })
+      .join("");
+    res
+      .set("Cache-Control", "no-store")
+      .type("html")
+      .send(
+        `<!doctype html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Labels · ${xml(parent.name)}</title><style>*{box-sizing:border-box}body{margin:0;padding:18px;font:13px/1.4 system-ui,sans-serif;color:#111;background:#fff}header{display:flex;justify-content:space-between;gap:12px;margin:0 0 14px;padding-bottom:12px;border-bottom:1px solid #ddd}header p{margin:0;color:#555}main{display:grid;grid-template-columns:repeat(auto-fill,minmax(52mm,1fr));gap:6mm}figure{margin:0;padding:4mm;border:1px dashed #aaa;display:grid;gap:2mm;justify-items:center;text-align:center;break-inside:avoid}figure svg{width:36mm;height:36mm}figcaption{display:grid;gap:1px;max-width:100%}figcaption strong{font-size:13px;overflow-wrap:anywhere}figcaption small{color:#666;font-size:9px;overflow-wrap:anywhere}@page{margin:10mm}@media print{header{display:none}body{padding:0}}</style></head><body><header><div><strong>${xml(parent.name)}</strong> · ${rows.length} label${rows.length === 1 ? "" : "s"}</div><p>Print this page (Ctrl+P or Cmd+P). Cut along the dashed lines.</p></header><main>${cells}</main></body></html>`,
+      );
+  });
   app.get("/api/codes/:id/experience/items", (req, res) => {
     const parent = template(req);
     res.json(

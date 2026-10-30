@@ -39,7 +39,7 @@ import { AssetPicker, type AssetFilter } from "./MediaLibrary";
 type Field = {
   id: string;
   label: string;
-  type: "text" | "email" | "phone" | "textarea" | "choice" | "rating";
+  type: "text" | "email" | "phone" | "textarea" | "choice" | "rating" | "serial";
   required: boolean;
   options: string[];
 };
@@ -68,7 +68,7 @@ type Stats = {
   scans: number;
   submissions: number;
   taps: number;
-  conversion: number;
+  actionsPerScan: number | null;
   actions: { blockId: string; label: string; kind: string; count: number }[];
 };
 export type Starter = {
@@ -571,6 +571,7 @@ function FieldEditor({
                   <option value="phone">Phone</option>
                   <option value="choice">Choice</option>
                   <option value="rating">Rating 1–5</option>
+                  <option value="serial">Item serial (automatic)</option>
                 </select>
                 <label className="xs-req">
                   <input
@@ -1098,8 +1099,8 @@ export default function ExperienceStudio({
                     ["Actions taken", stats.submissions + stats.taps],
                     ["Form responses", stats.submissions],
                     [
-                      "Action rate",
-                      `${Math.round(stats.conversion * 100)}%`,
+                      "Actions per scan",
+                      stats.actionsPerScan === null ? "—" : stats.actionsPerScan.toFixed(2),
                     ],
                   ].map(([label, value]) => (
                     <div key={label as string}>
@@ -1110,6 +1111,10 @@ export default function ExperienceStudio({
                     </div>
                   ))}
                 </div>
+                <p className="muted">
+                  Actions per scan includes repeat taps and submitted forms, so it can exceed 1.
+                  Deleted or expired form responses are excluded from these totals.
+                </p>
                 <h3 className="xs-h">What visitors did</h3>
                 {stats.actions.length ? (
                   <ul className="xs-actions">

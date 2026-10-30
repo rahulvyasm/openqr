@@ -11,7 +11,7 @@ export default defineConfig({
   fullyParallel: false,
   reporter: [["list"]],
   expect: {
-    toHaveScreenshot: { maxDiffPixelRatio: 0.015, animations: "disabled" },
+    toHaveScreenshot: { maxDiffPixelRatio: 0.002, animations: "disabled" },
   },
   use: {
     // Windows baselines come from the installed Edge. Set VISUAL_CHANNEL (msedge, chrome)

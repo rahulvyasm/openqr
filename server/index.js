@@ -3,6 +3,7 @@ import { mkdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { createApp } from "./app.js";
 import { createBackup } from "./backup.js";
+import { purgeExpiredResponses } from "./experience.js";
 import { loadConfig } from "./config.js";
 let config;
 try {
@@ -37,6 +38,13 @@ const server = app.listen(port, host, () =>
   console.log(`OpenQR API listening on http://localhost:${port}`),
 );
 let backingUp = false;
+const responseCleanupTimer = setInterval(() => {
+  try {
+    purgeExpiredResponses(db);
+  } catch (error) {
+    console.error("OpenQR response cleanup failed:", error.message);
+  }
+}, 3600000).unref();
 let backupInFlight;
 const backupTimer = backupHours
   ? setInterval(async () => {
@@ -60,6 +68,7 @@ const backupTimer = backupHours
     }, backupHours * 3600000).unref()
   : null;
 function stop() {
+  clearInterval(responseCleanupTimer);
   if (backupTimer) clearInterval(backupTimer);
   server.close(async () => {
     await backupInFlight?.catch(() => {});

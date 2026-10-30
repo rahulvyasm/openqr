@@ -46,7 +46,15 @@ export function safeAction(value) {
 const field = z.object({
   id: z.string().regex(/^[a-z0-9]{1,12}$/),
   label: text(80).min(1),
-  type: z.enum(["text", "email", "phone", "textarea", "choice", "rating"]),
+  type: z.enum([
+    "text",
+    "email",
+    "phone",
+    "textarea",
+    "choice",
+    "rating",
+    "serial",
+  ]),
   required: z.boolean().default(false),
   options: z.array(text(60).min(1)).max(8).default([]),
 });
@@ -211,9 +219,29 @@ export function isVisible(block, now = new Date(), zone = "UTC") {
   return w.from <= w.to ? at >= w.from && at < w.to : at >= w.from || at < w.to;
 }
 
-export function formAnswers(block, input) {
-  const answers = {};
+export function formAnswers(block, input, item = null) {
+  const answers = Object.create(null);
+  let filled = 0;
+  const labels = new Set(block.fields.map((f) => f.label));
+  const used = new Set();
+  // Reserve keys even for unanswered fields so optional answers cannot shift names.
+  const keys = block.fields.map((f) => {
+    let key = f.label;
+    let suffix = 2;
+    while (used.has(key)) {
+      do key = `${f.label} (${suffix++})`;
+      while (labels.has(key) || used.has(key));
+    }
+    used.add(key);
+    return key;
+  });
   for (const f of block.fields) {
+    // The serial comes from the item page itself, never from what the visitor sends.
+    if (f.type === "serial") {
+      const own = item ? item.serial || item.name : "";
+      if (own) answers[keys[block.fields.indexOf(f)]] = own;
+      continue;
+    }
     let value = String(input[`f_${f.id}`] ?? "")
       .replace(/\r\n/g, "\n")
       .trim();
@@ -231,16 +259,17 @@ export function formAnswers(block, input) {
       return { error: `Choose one of the options for “${f.label}”.` };
     if (f.type === "rating" && !/^[1-5]$/.test(value))
       return { error: `Choose a rating for “${f.label}”.` };
-    answers[f.label] = value;
+    answers[keys[block.fields.indexOf(f)]] = value;
+    filled++;
   }
-  return { answers };
+  return { answers, filled };
 }
 
 const css = (p) => {
   const accent = p.accent || "#285b48",
     dark = p.theme === "bold",
     radius = p.corners === "square" ? "0" : "16px";
-  return `*{box-sizing:border-box}body{margin:0;min-height:100vh;font:16px/1.65 ${p.font === "serif" ? "Georgia,serif" : "system-ui,-apple-system,Segoe UI,sans-serif"};color:${dark ? "#fff" : "#1f2d26"};background:${dark ? accent : p.theme === "minimal" ? "#fff" : "#f0f3ec"};padding:28px 16px}main{max-width:480px;margin:auto;display:grid;gap:16px}.xp-card{background:${dark ? "#ffffff14" : "#fff"};border:1px solid ${dark ? "#ffffff30" : "#e4eadc"};border-radius:${radius};padding:22px;overflow:hidden}h1{font-size:32px;line-height:1.15;letter-spacing:-1px;margin:4px 0 6px;overflow-wrap:anywhere}h2{font-size:20px;letter-spacing:-.4px;margin:0 0 6px}p{margin:0;white-space:pre-line;overflow-wrap:anywhere;color:${dark ? "#ffffffcc" : "#5d6b63"}}.xp-sub{font-size:15px}.xp-image,.xp-video{display:block;width:100%;border-radius:${radius};background:#0001}.xp-image{height:auto}figure{margin:0}figcaption{font-size:13px;color:${dark ? "#ffffffb0" : "#7d8b82"};padding-top:8px}.xp-btn{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:16px 18px;border-radius:${radius === "0" ? "0" : "14px"};text-decoration:none;font-weight:600;font-size:15px;border:1.5px solid ${dark ? "#fff" : accent};color:${p.buttonStyle === "solid" && !dark ? "#fff" : dark ? accent : accent};background:${p.buttonStyle === "solid" && !dark ? accent : dark ? "#fff" : "transparent"}}.xp-stack{display:grid;gap:10px}label{display:grid;gap:6px;font-size:14px;font-weight:600;margin-top:14px}input,textarea,select{font:inherit;font-weight:400;padding:12px 14px;border:1px solid #cfd8c8;border-radius:${radius === "0" ? "0" : "10px"};background:#fff;color:#1f2d26;width:100%}textarea{min-height:96px;resize:vertical}.xp-rate{display:flex;gap:8px;margin-top:6px}.xp-rate label{margin:0;flex:1;position:relative}.xp-rate input{position:absolute;opacity:0}.xp-rate span{display:block;text-align:center;padding:12px 0;border:1px solid #cfd8c8;border-radius:10px;background:#fff;color:#1f2d26}.xp-rate input:checked+span{background:${accent};color:#fff;border-color:${accent}}.xp-rate input:focus-visible+span{outline:2px solid ${accent};outline-offset:2px}button.xp-send{margin-top:18px;width:100%;padding:15px;border:0;border-radius:${radius === "0" ? "0" : "12px"};background:${dark ? "#fff" : accent};color:${dark ? accent : "#fff"};font:600 15px inherit;font-family:inherit;cursor:pointer}.xp-note{padding:12px 14px;border-radius:10px;margin-top:14px;font-size:14px}.xp-ok{background:#e4f6e9;color:#1d5a32}.xp-err{background:#fde8e6;color:#8a2a22}.xp-item dl{margin:14px 0 0;display:grid;gap:8px}.xp-item dl div{display:flex;justify-content:space-between;gap:12px}.xp-item dt{color:#7d8b82;font-size:14px}.xp-item dd{margin:0;font-weight:600;text-align:right;overflow-wrap:anywhere}.xp-item h3{font-size:15px;margin:20px 0 6px}.xp-item ul{list-style:none;margin:0;padding:0;display:grid;gap:8px}.xp-item li{display:grid;gap:2px;padding:10px 12px;border-radius:10px;background:#0000000a}.xp-item time{font-size:12px;color:#7d8b82}.xp-trap{position:absolute;left:-9999px;height:0;overflow:hidden}.xp-foot{text-align:center;font-size:12px;color:${dark ? "#ffffff99" : "#9aa690"};padding:10px 0 4px}a:focus-visible,button:focus-visible{outline:2px solid ${accent};outline-offset:3px}`;
+  return `*{box-sizing:border-box}body{margin:0;min-height:100vh;font:16px/1.65 ${p.font === "serif" ? "Georgia,serif" : "system-ui,-apple-system,Segoe UI,sans-serif"};color:${dark ? "#fff" : "#1f2d26"};background:${dark ? accent : p.theme === "minimal" ? "#fff" : "#f0f3ec"};padding:28px 16px}main{max-width:480px;margin:auto;display:grid;gap:16px}.xp-card{background:${dark ? "#ffffff14" : "#fff"};border:1px solid ${dark ? "#ffffff30" : "#e4eadc"};border-radius:${radius};padding:22px;overflow:hidden}h1{font-size:32px;line-height:1.15;letter-spacing:-1px;margin:4px 0 6px;overflow-wrap:anywhere}h2{font-size:20px;letter-spacing:-.4px;margin:0 0 6px}p{margin:0;white-space:pre-line;overflow-wrap:anywhere;color:${dark ? "#ffffffcc" : "#5d6b63"}}.xp-sub{font-size:15px}.xp-image,.xp-video{display:block;width:100%;border-radius:${radius};background:#0001}.xp-image{height:auto}figure{margin:0}figcaption{font-size:13px;color:${dark ? "#ffffffb0" : "#7d8b82"};padding-top:8px}.xp-btn{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:16px 18px;border-radius:${radius === "0" ? "0" : "14px"};text-decoration:none;font-weight:600;font-size:15px;border:1.5px solid ${dark ? "#fff" : accent};color:${p.buttonStyle === "solid" && !dark ? "#fff" : dark ? accent : accent};background:${p.buttonStyle === "solid" && !dark ? accent : dark ? "#fff" : "transparent"}}.xp-stack{display:grid;gap:10px}label{display:grid;gap:6px;font-size:14px;font-weight:600;margin-top:14px}input,textarea,select{font:inherit;font-weight:400;padding:12px 14px;border:1px solid #cfd8c8;border-radius:${radius === "0" ? "0" : "10px"};background:#fff;color:#1f2d26;width:100%}textarea{min-height:96px;resize:vertical}.xp-rate{display:flex;gap:8px;margin-top:6px}.xp-rate label{margin:0;flex:1;position:relative}.xp-rate input{position:absolute;opacity:0}.xp-rate span{display:block;text-align:center;padding:12px 0;border:1px solid #cfd8c8;border-radius:10px;background:#fff;color:#1f2d26}.xp-rate input:checked+span{background:${accent};color:#fff;border-color:${accent}}.xp-rate input:focus-visible+span{outline:2px solid ${accent};outline-offset:2px}button.xp-send{margin-top:18px;width:100%;padding:15px;border:0;border-radius:${radius === "0" ? "0" : "12px"};background:${dark ? "#fff" : accent};color:${dark ? accent : "#fff"};font:600 15px inherit;font-family:inherit;cursor:pointer}.xp-note{padding:12px 14px;border-radius:10px;margin-top:14px;font-size:14px}.xp-ok{background:#e4f6e9;color:#1d5a32}.xp-err{background:#fde8e6;color:#8a2a22}.xp-item dl{margin:14px 0 0;display:grid;gap:8px}.xp-item dl div{display:flex;justify-content:space-between;gap:12px}.xp-item dt{color:#7d8b82;font-size:14px}.xp-item dd{margin:0;font-weight:600;text-align:right;overflow-wrap:anywhere}.xp-item h3{font-size:15px;margin:20px 0 6px}.xp-item ul{list-style:none;margin:0;padding:0;display:grid;gap:8px}.xp-item li{display:grid;gap:2px;padding:10px 12px;border-radius:10px;background:#0000000a}.xp-item time{font-size:12px;color:#7d8b82}.xp-report{margin-top:16px}input[readonly]{background:#f3f5f0;color:#5d6b63}.xp-trap{position:absolute;left:-9999px;height:0;overflow:hidden}.xp-foot{text-align:center;font-size:12px;color:${dark ? "#ffffff99" : "#9aa690"};padding:10px 0 4px}a:focus-visible,button:focus-visible{outline:2px solid ${accent};outline-offset:3px}`;
 };
 
 export function renderExperience(
@@ -262,6 +291,8 @@ export function renderExperience(
       : `/r/${encodeURIComponent(slug)}/go/${encodeURIComponent(blockId)}?i=${index}&ticket=${encodeURIComponent(ticket)}`;
   const arrow = '<span aria-hidden="true">↗</span>';
   const renderField = (f) => {
+    if (f.type === "serial")
+      return `<label>${xml(f.label)}<input value="${xml(item ? item.serial || item.name : "SN-0001")}" readonly></label>`;
     const name = `f_${f.id}`,
       value = xml(values[name] ?? ""),
       req = f.required ? " required" : "";
@@ -303,7 +334,10 @@ export function renderExperience(
         ? `Active until ${day(data.warrantyUntil)}`
         : `Expired on ${day(data.warrantyUntil)}`
       : "";
-    return `<div class="xp-card xp-item"><h2>${xml(b.title)}</h2>${sample ? '<p class="xp-sub">Example details. Each item shows its own.</p>' : ""}<dl><div><dt>Item</dt><dd>${xml(data.name)}</dd></div>${data.serial ? `<div><dt>Serial</dt><dd>${xml(data.serial)}</dd></div>` : ""}${warranty ? `<div><dt>Warranty</dt><dd>${xml(warranty)}</dd></div>` : ""}</dl><h3>Service history</h3>${data.history.length ? `<ul>${data.history.map((h) => `<li><time>${xml(day(h.date))}</time><span>${xml(h.note)}</span></li>`).join("")}</ul>` : "<p>No service recorded yet.</p>"}</div>`;
+    const report = blocks.find(
+      (x) => x.type === "form" && /problem/i.test(x.title),
+    );
+    return `<div class="xp-card xp-item"><h2>${xml(b.title)}</h2>${sample ? '<p class="xp-sub">Example details. Each item shows its own.</p>' : ""}<dl><div><dt>Item</dt><dd>${xml(data.name)}</dd></div>${data.serial ? `<div><dt>Serial</dt><dd>${xml(data.serial)}</dd></div>` : ""}${warranty ? `<div><dt>Warranty</dt><dd>${xml(warranty)}</dd></div>` : ""}</dl><h3>Service history</h3>${data.history.length ? `<ul>${data.history.map((h) => `<li><time>${xml(day(h.date))}</time><span>${xml(h.note)}</span></li>`).join("")}</ul>` : "<p>No service recorded yet.</p>"}${report ? `<a class="xp-btn xp-report" href="#b-${xml(report.id)}"><span>Report a problem</span><span aria-hidden="true">↓</span></a>` : ""}</div>`;
   };
   const renderBlock = (b) => {
     switch (b.type) {
@@ -396,6 +430,7 @@ export function templates() {
           successMessage: "Report received. We will be in touch.",
           fields: [
             { id: fid(1), label: "Email", type: "email", required: true, options: [] },
+            { id: fid(3), label: "Serial number", type: "serial", required: false, options: [] },
             { id: fid(2), label: "What happened?", type: "textarea", required: true, options: [] },
           ],
         },
