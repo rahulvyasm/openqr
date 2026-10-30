@@ -167,6 +167,7 @@ const pointerEffects = new Set([
   "[data-spot]",
 ]);
 function scan(root: ParentNode) {
+  let fresh = 0;
   const hover = matchMedia("(hover:hover)").matches;
   for (const [selector, run] of handlers) {
     if (reduced && selector !== "[data-spot]") continue;
@@ -178,11 +179,13 @@ function scan(root: ParentNode) {
       const done = handled.get(el) ?? new Set<string>();
       if (done.has(selector)) continue;
       done.add(selector);
+      fresh++;
       handled.set(el, done);
       const off = run(el);
       if (off) cleanups.set(el, off);
     }
   }
+  return fresh;
 }
 
 let started = false;
@@ -193,15 +196,24 @@ export function startMotion() {
   gsap.defaults({ overwrite: "auto" });
   scan(document);
   let queued = false;
+  const pending = new Set<HTMLElement>();
   new MutationObserver((records) => {
+    // Every batch is collected: React can mount a page in several mutations per frame.
+    for (const record of records)
+      for (const node of record.addedNodes)
+        if (node instanceof HTMLElement) pending.add(node);
     if (queued) return;
     queued = true;
     requestAnimationFrame(() => {
       queued = false;
-      for (const record of records)
-        for (const node of record.addedNodes)
-          if (node instanceof HTMLElement) scan(node);
-      ScrollTrigger.refresh();
+      const nodes = [...pending];
+      pending.clear();
+      let fresh = 0;
+      for (const node of nodes)
+        // ScrollTrigger's own pin wrappers must not trigger another refresh.
+        if (node.isConnected && !node.classList.contains("pin-spacer"))
+          fresh += scan(node);
+      if (fresh) ScrollTrigger.refresh();
     });
   }).observe(document.body, { childList: true, subtree: true });
 }
