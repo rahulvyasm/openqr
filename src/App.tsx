@@ -5,6 +5,7 @@ import {
   ArrowRight,
   ArrowUpRight,
   BarChart3,
+  Blocks,
   CheckCircle2,
   Code2,
   Copy,
@@ -62,6 +63,7 @@ import SettingsView from "./components/SettingsView";
 import Modal from "./components/Modal";
 import QrImage from "./components/QrImage";
 import Editor from "./components/Editor";
+import ExperienceStudio from "./components/ExperienceStudio";
 import BulkImport from "./components/BulkImport";
 import DesignStudio from "./components/DesignStudio";
 import BatchBar from "./components/BatchBar";
@@ -83,6 +85,7 @@ import "@fontsource/geist/latin-600.css";
 import "@fontsource/geist-mono/latin-400.css";
 import "@fontsource/geist-mono/latin-500.css";
 import "./design.css";
+import "./experience.css";
 import { typeIcons as icons } from "./components/codeTypes";
 const OperatorConsole = React.lazy(
   () => import("./components/OperatorConsole"),
@@ -265,6 +268,7 @@ export default function App() {
   const [filter, setFilter] = useState("all");
   const [view, setView] = useState("list");
   const [editor, setEditor] = useState<Code | "new" | null>(null);
+  const [studio, setStudio] = useState<Code | null>(null);
   const [folderModal, setFolderModal] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Code | null>(null);
   const [detail, setDetail] = useState<Code | null>(null);
@@ -1434,6 +1438,17 @@ export default function App() {
                                     className="dropdown"
                                     onClick={(e) => e.stopPropagation()}
                                   >
+                                    {code.type === "experience" && (
+                                      <button
+                                        onClick={() => {
+                                          setStudio(code);
+                                          setMenu("");
+                                        }}
+                                      >
+                                        <Blocks size={15} />
+                                        Experience Studio
+                                      </button>
+                                    )}
                                     {canEdit && (
                                       <button
                                         onClick={() => {
@@ -1622,12 +1637,14 @@ export default function App() {
             setEditor(null);
             setDraft(undefined);
           }}
-          onSave={() => {
+          onSave={(saved) => {
             notify(
               editor === "new"
                 ? "Your QR code is ready. Download it and make a connection."
                 : "Changes saved.",
             );
+            if (editor === "new" && saved?.type === "experience")
+              setStudio(saved);
             setEditor(null);
             setDraft(undefined);
             setPage("codes");
@@ -1636,6 +1653,17 @@ export default function App() {
           }}
         />
       )}{" "}
+      {studio && (
+        <ExperienceStudio
+          code={studio}
+          role={auth.workspace?.role}
+          onClose={() => setStudio(null)}
+          onPublished={() => {
+            notify("Published. Everyone who scans sees the new version.");
+            refresh();
+          }}
+        />
+      )}
       {bulkOpen && (
         <BulkImport
           folders={folders}

@@ -31,6 +31,7 @@ export const codeSchema = z.object({
     "video",
     "hosted-event",
     "app",
+    "experience",
   ]),
   dynamic: z.boolean().default(false),
   data: z.record(z.string(), z.string().max(20000)),

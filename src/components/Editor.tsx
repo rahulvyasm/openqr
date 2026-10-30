@@ -38,6 +38,7 @@ import PublishingFields, { PagePreview } from "./PublishingFields";
 import { useDesignHistory } from "./useDesignHistory";
 import type { StudioDraft } from "./StudioHero";
 import LocalLinkNotice from "./LocalLinkNotice";
+import { PhoneFrame, StarterPicker, type Block } from "./ExperienceStudio";
 
 const localDate = (value?: string | null) => {
   if (!value) return "";
@@ -67,7 +68,7 @@ export default function Editor({
   initialDraft?: StudioDraft;
   onTemplates: () => void;
   onClose: () => void;
-  onSave: () => void;
+  onSave: (saved?: Code) => void;
 }) {
   const [step, setStep] = useState(0),
     [type, setType] = useState<CodeType>(
@@ -76,11 +77,20 @@ export default function Editor({
     [dynamic, setDynamic] = useState(code?.dynamic ?? true),
     [name, setName] = useState(code?.name || "");
   const [preview, setPreview] = useState<"qr" | "page">(
-    hasPublishingPage(code?.type || initialDraft?.type || "url")
+    hasPublishingPage(code?.type || initialDraft?.type || "url") ||
+      (code?.type || initialDraft?.type) === "experience"
       ? "page"
       : "qr",
   );
-  const hasPagePreview = hasPublishingPage(type);
+  const hasPagePreview = hasPublishingPage(type) || type === "experience";
+  let experienceBlocks: Block[] = [];
+  try {
+    experienceBlocks = JSON.parse(
+      (code?.data || {}).blocks || "[]",
+    ) as Block[];
+  } catch {
+    /* Preview shows an empty page. */
+  }
   const [data, setData] = useState<Record<string, string>>(
     code?.data || {
       security: "WPA",
@@ -174,7 +184,7 @@ export default function Editor({
     setBusy(true);
     setError("");
     try {
-      await api(
+      const saved = await api<Code>(
         code ? `/codes/${code.id}` : "/codes",
         {
           name,
@@ -191,7 +201,7 @@ export default function Editor({
         },
         code ? "PUT" : "POST",
       );
-      onSave();
+      onSave(saved);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -254,7 +264,11 @@ export default function Editor({
                         className={`type-option ${type === t ? "selected" : ""}`}
                         onClick={() => {
                           setType(t);
-                          setPreview(hasPublishingPage(t) ? "page" : "qr");
+                          setPreview(
+                            hasPublishingPage(t) || t === "experience"
+                              ? "page"
+                              : "qr",
+                          );
                           setDynamic(t === "url" || isHosted(t));
                           if (t === "business") changeData("links", "[]");
                           changeData("mediaId", "");
@@ -284,6 +298,31 @@ export default function Editor({
                     maxLength={100}
                   />
                 </label>
+                {type === "experience" && (
+                  <>
+                    {code ? (
+                      <p className="hint">
+                        Change what visitors see in Experience Studio, from the
+                        code’s menu. Drafts, publishing and history live there.
+                      </p>
+                    ) : (
+                      <>
+                        <span className="small-label">START FROM AN INTENTION</span>
+                        <StarterPicker
+                          value={data.title || ""}
+                          onPick={(s) => {
+                            setData((d) => ({
+                              ...d,
+                              title: s.title,
+                              blocks: JSON.stringify(s.blocks),
+                            }));
+                            setName((n) => n || s.name);
+                          }}
+                        />
+                      </>
+                    )}
+                  </>
+                )}
                 {hasPublishingPage(type) && (
                   <PublishingFields
                     type={type}
@@ -752,8 +791,25 @@ export default function Editor({
                 ))}
               </div>
             )}
-            {hasPagePreview && preview === "page" && (
+            {hasPublishingPage(type) && preview === "page" && (
               <PagePreview type={type} data={data} options={pageOptions} />
+            )}
+            {type === "experience" && preview === "page" && (
+              <PhoneFrame
+                title={data.title || name || "Preview"}
+                blocks={
+                  code
+                    ? experienceBlocks
+                    : (() => {
+                        try {
+                          return JSON.parse(data.blocks || "[]") as Block[];
+                        } catch {
+                          return [];
+                        }
+                      })()
+                }
+                options={pageOptions}
+              />
             )}
             <div className="preview-tip">
               <Sparkles size={18} />

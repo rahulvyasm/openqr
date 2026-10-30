@@ -7,3 +7,4 @@ data/
 coverage/
 public/pdfjs/
 .design-data/
+.landing-data/

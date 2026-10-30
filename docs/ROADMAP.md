@@ -109,3 +109,12 @@ The supplied QRCG screens also show coupons, feedback/ratings, and GS1 2D barcod
 - Online payment collection (needs final INR prices and a payment provider such as Razorpay).
 - Track down intermittently failing media and publishing tests.
 - Support gaps: file or screenshot attachments on requests, merging duplicate cases, and reply-time targets.
+
+## Parked for later (experiences)
+
+- Adaptive rules (breakfast in the morning, directions after closing) with a preview for every rule.
+- Email or webhook alert to the owner when a form is submitted (the support notifier can be reused).
+- Per-item connected pages (product or asset with its own page, service history and warranty).
+- AI-drafted experiences from a short brief (needs a provider decision and key handling).
+- Drag-and-drop block ordering, a block for maps and hours, and file uploads inside forms.
+- Browser-level visual tests for Experience Studio and the public page.

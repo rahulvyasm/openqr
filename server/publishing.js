@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { problem } from "./security.js";
 import { collectionTypes, validateCollection } from "./collections.js";
+import { validateExperience } from "./experience-blocks.js";
 import { socialLinkError, socialUrlKey } from "../shared/social.js";
 export const hostedTypes = [
   "links",
@@ -9,6 +10,7 @@ export const hostedTypes = [
   "business",
   "social",
   ...collectionTypes,
+  "experience",
 ];
 export const pageOptionsSchema = z
   .object({
@@ -50,6 +52,7 @@ export function safeWebsite(value) {
   return url.href;
 }
 export function validateHosted(code) {
+  if (code.type === "experience") return validateExperience(code);
   if (collectionTypes.includes(code.type)) return validateCollection(code);
   const d = code.data;
   if (["contact", "business"].includes(code.type) && d.website)

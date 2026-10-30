@@ -7,6 +7,7 @@ import { codeSchema, payload, destination } from "./payload.js";
 import { normalizeDesign, imageFor } from "./design.js";
 import { linksPage, hostedPage, unavailablePage } from "./pages.js";
 import { hostedTypes } from "./publishing.js";
+import { renderExperience, parseBlocks } from "./experience-blocks.js";
 import { referencedAssets, validateAssetReferences } from "./storage.js";
 import {
   availability,
@@ -386,6 +387,11 @@ export function registerCodeRoutes(
         req.assertEdit();
         if (!getCode(old.id, req.workspace.id))
           throw invalid("QR code not found.", 404);
+        // Page content has its own draft and publish flow in Experience Studio.
+        if (old.type === "experience") {
+          const live = JSON.parse(old.data);
+          c.data = { ...c.data, title: live.title, blocks: live.blocks };
+        }
         validateAssetReferences(db, c.data, req.workspace.id, c.type);
         db.prepare(
           "UPDATE codes SET name=?,data=?,folder_id=?,color=?,active=?,design=?,campaign=?,page_options=? WHERE id=? AND workspace_id=?",
@@ -622,6 +628,24 @@ export function registerCodeRoutes(
         .send(unavailablePage(result.message));
     if (result.code.type === "links")
       return res.type("html").send(linksPage(result.code));
+    if (result.code.type === "experience") {
+      const c = result.code,
+        ticket = publicTicket(c.id, analyticsSalt, 25),
+        mediaUrl = (id) =>
+          `/r/${encodeURIComponent(c.slug)}/media/${encodeURIComponent(id)}?ticket=${encodeURIComponent(ticket)}`;
+      return res.type("html").send(
+        renderExperience(
+          {
+            title: c.data.title || c.name,
+            blocks: parseBlocks(c.data),
+            slug: c.slug,
+            pageOptions: c.pageOptions,
+            ticket,
+          },
+          { mediaUrl },
+        ),
+      );
+    }
     if (hostedTypes.includes(result.code.type)) {
       const c = result.code,
         ticket = publicTicket(

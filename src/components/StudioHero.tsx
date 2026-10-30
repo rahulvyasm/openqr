@@ -6,10 +6,10 @@ import {
   Globe,
   Radio,
   ScanLine,
-  Wifi,
   FileText,
   Link,
   CalendarDays,
+  Blocks,
 } from "lucide-react";
 import QrImage from "./QrImage";
 import type { CodeType } from "../lib";
@@ -162,10 +162,10 @@ export default function StudioHero({
           <strong>CONNECTING?</strong>
         </span>
         {[
+          { type: "experience", name: "An experience", icon: Blocks },
           { type: "url", name: "A website", icon: Globe },
           { type: "pdf", name: "A document", icon: FileText },
           { type: "links", name: "Your links", icon: Link },
-          { type: "wifi", name: "Wi-Fi", icon: Wifi },
           { type: "hosted-event", name: "An event", icon: CalendarDays },
         ].map(({ type, name, icon: Icon }) => (
           <button

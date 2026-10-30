@@ -18,6 +18,7 @@ import {
   Video,
   CalendarClock,
   Smartphone,
+  Blocks,
 } from "lucide-react";
 export const typeIcons = {
   url: Globe,
@@ -40,6 +41,7 @@ export const typeIcons = {
   video: Video,
   "hosted-event": CalendarClock,
   app: Smartphone,
+  experience: Blocks,
 };
 export const typeDescriptions = {
   url: "Any website, one scan away",
@@ -62,4 +64,5 @@ export const typeDescriptions = {
   video: "A mobile premiere for your video",
   "hosted-event": "An event page with directions and calendar download",
   app: "Send each phone to the right app store",
+  experience: "A whole mobile experience: content, forms and results behind one code",
 };

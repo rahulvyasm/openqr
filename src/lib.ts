@@ -21,7 +21,8 @@ export type CodeType =
   | "audio"
   | "video"
   | "hosted-event"
-  | "app";
+  | "app"
+  | "experience";
 export type PageOptions = {
   theme: "minimal" | "soft" | "bold";
   accent: string;
@@ -54,9 +55,10 @@ export const isHosted = (type: CodeType) =>
     "video",
     "hosted-event",
     "app",
+    "experience",
   ].includes(type);
 export const hasPublishingPage = (type: CodeType) =>
-  isHosted(type) && type !== "links";
+  isHosted(type) && type !== "links" && type !== "experience";
 export type PageTemplate = {
   id: string;
   name: string;
@@ -189,6 +191,7 @@ export const typeNames: Record<CodeType, string> = {
   video: "Video",
   "hosted-event": "Event page",
   app: "App stores",
+  experience: "Experience",
 };
 export function codeContent(
   code: Pick<Code, "type" | "data" | "dynamic" | "shortUrl">,
@@ -237,6 +240,7 @@ export function codeContent(
     case "video":
     case "hosted-event":
     case "app":
+    case "experience":
       return code.shortUrl;
   }
 }

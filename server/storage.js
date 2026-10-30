@@ -18,6 +18,7 @@ import { problem, audit } from "./security.js";
 import { constants } from "node:fs";
 import { inspectMedia } from "./media.js";
 import { parseGallery } from "./collections.js";
+import { blockAssetsOfData, assertBlockAssets, parseBlocks } from "./experience-blocks.js";
 
 export const assetFields = ["pdfId", "portraitId", "coverId", "mediaId"];
 export const referencedAssets = (data) => {
@@ -30,6 +31,7 @@ export const referencedAssets = (data) => {
       [
         ...assetFields.map((key) => data[key]),
         ...(Array.isArray(items) ? items.map((item) => item?.assetId) : []),
+        ...blockAssetsOfData(data),
       ].filter(Boolean),
     ),
   ];
@@ -230,6 +232,8 @@ export function validateAssetReferences(db, data, workspaceId, type) {
   }
   if (type === "pdf" && !data.pdfId)
     throw problem("Choose a PDF for this page.");
+  if (type === "experience")
+    assertBlockAssets(db, parseBlocks(data), workspaceId);
   if (type === "gallery")
     for (const item of parseGallery(data)) {
       const row = db

@@ -49,6 +49,30 @@ const steps = [
   },
 ];
 
+const experiences = [
+  {
+    key: "product",
+    label: "Product",
+    title: "Meet the Aero kettle",
+    lines: ["Set-up guide", "Descale in 3 steps", "Watch: first boil"],
+    form: "Register your warranty",
+  },
+  {
+    key: "event",
+    label: "Event",
+    title: "Welcome to Forma 26",
+    lines: ["Full schedule", "Venue map", "Speaker directory"],
+    form: "Will you join us?",
+  },
+  {
+    key: "menu",
+    label: "Café",
+    title: "Breakfast until 11",
+    lines: ["Cardamom bun", "Flat white", "Get directions"],
+    form: "Tell us how we did",
+  },
+];
+
 function useQrCells(content: string) {
   return useMemo(() => {
     const qr = QRCode.create(content, { errorCorrectionLevel: "H" });
@@ -111,6 +135,9 @@ export default function Landing({
   const hero = useQrCells("https://openqr.dev/hello");
   const demo = useQrCells("https://openqr.dev/design");
   const panel = useRef<HTMLElement>(null);
+  const [xp, setXp] = useState(0);
+  const [xpPaused, setXpPaused] = useState(false);
+  const xpQr = useQrCells("https://openqr.dev/r/aero");
 
   useLayoutEffect(() => {
     const ctx = gsap.context(() => {
@@ -142,7 +169,8 @@ export default function Landing({
             0.2,
           );
         gsap.to(".l-scan", {
-          yPercent: 1000,
+          top: "100%",
+          yPercent: -100,
           duration: 2.6,
           ease: "sine.inOut",
           repeat: -1,
@@ -237,6 +265,27 @@ export default function Landing({
     }, root);
     return () => ctx.revert();
   }, []);
+
+  useEffect(() => {
+    if (xpPaused || matchMedia("(prefers-reduced-motion: reduce)").matches)
+      return;
+    const timer = setInterval(
+      () => setXp((n) => (n + 1) % experiences.length),
+      3800,
+    );
+    return () => clearInterval(timer);
+  }, [xpPaused]);
+  useEffect(() => {
+    if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const ctx = gsap.context(() => {
+      gsap.fromTo(
+        ".l-xp-screen > *",
+        { autoAlpha: 0, y: 18 },
+        { autoAlpha: 1, y: 0, duration: 0.7, stagger: 0.07, ease: "expo.out" },
+      );
+    }, root);
+    return () => ctx.revert();
+  }, [xp]);
 
   useLayoutEffect(() => {
     if (panel.current) gsap.set(panel.current, { xPercent: 105 });
@@ -368,6 +417,60 @@ export default function Landing({
         </div>
       </section>
 
+      <section className="l-xp" aria-labelledby="xp-title">
+        <div className="l-xp-copy">
+          <span className="l-kicker" data-reveal>
+            <i /> EXPERIENCES
+          </span>
+          <h2 id="xp-title" data-reveal>
+            One code. <em>Any</em> experience.
+          </h2>
+          <p data-reveal>
+            Build the whole page behind your code: story, video, files, forms.
+            Visitors take action, you see the results, and the printed code
+            never changes.
+          </p>
+          <div className="l-xp-tabs" role="tablist" aria-label="Examples">
+            {experiences.map((e, i) => (
+              <button
+                key={e.key}
+                role="tab"
+                aria-selected={xp === i}
+                className={xp === i ? "on" : ""}
+                onClick={() => {
+                  setXp(i);
+                  setXpPaused(true);
+                }}
+              >
+                {e.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="l-xp-art" aria-hidden="true">
+          <div className="l-xp-qr">
+            <QrField cells={xpQr.cells} size={xpQr.size} />
+          </div>
+          <div className="l-xp-phone">
+            <i />
+            <div className="l-xp-screen" key={experiences[xp].key}>
+              <h3>{experiences[xp].title}</h3>
+              {experiences[xp].lines.map((line) => (
+                <span key={line}>
+                  {line} <b>↗</b>
+                </span>
+              ))}
+              <div className="l-xp-form">
+                <strong>{experiences[xp].form}</strong>
+                <u />
+                <u />
+                <em>Send</em>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section className="l-features" id="features">
         <span className="l-kicker" data-reveal>
           <i /> WHAT IS INSIDE
@@ -400,9 +503,9 @@ export default function Landing({
             </svg>
           </article>
           <article data-spot>
-            <small>03 / PAGES</small>
-            <h3>Galleries, events, audio, video.</h3>
-            <p>Landing pages built in, hosted by you.</p>
+            <small>03 / EXPERIENCES</small>
+            <h3>Pages that do things.</h3>
+            <p>Forms, RSVPs and enquiries, with results next to your scans.</p>
           </article>
           <article data-spot className="b-wide b-dark">
             <small>04 / YOURS</small>

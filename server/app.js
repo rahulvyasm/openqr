@@ -14,6 +14,7 @@ import { access, problem, canManage } from "./security.js";
 import { readBackupStatus } from "./backup-status.js";
 import { registerOperatorRoutes } from "./operator.js";
 import { registerSupportRoutes } from "./support.js";
+import { migrateExperiences, registerExperienceRoutes } from "./experience.js";
 import { createNotifier } from "./notify.js";
 import {
   createEntitlements,
@@ -59,6 +60,7 @@ export function createApp({
     migrateWorkspaces(db);
     migratePublishing(db);
     migrateCollections(db);
+    migrateExperiences(db);
   } catch (error) {
     db.close();
     throw error;
@@ -207,6 +209,7 @@ export function createApp({
     });
   });
   registerCodeRoutes(app, db, origin, analyticsSalt, storage, entitlements);
+  registerExperienceRoutes(app, db, origin, analyticsSalt);
   app.get("/api/folders", (req, res) =>
     res.json(
       db

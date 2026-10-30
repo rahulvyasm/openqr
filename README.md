@@ -197,6 +197,16 @@ Upload PDF, PNG, or JPEG files up to **20 MB** in **Media library** or from the 
 - **Social media:** up to 12 labeled links with platform icons, cover, and description.
 - New publishing pages include Minimal, Soft, and Bold themes, an accent color, optional attribution, and a landing-page preview. Existing link pages retain their original layout.
 
+### Experiences
+
+An **Experience** is a hosted page you build from blocks: heading, text, image, video, button, link list, file and form. Create one from an intention (product companion, event welcome, business enquiry or guest feedback), then change it any time in **Experience Studio** (code menu → Experience Studio) without touching the printed code.
+
+- **Draft, publish, restore:** edits autosave as a draft and visitors keep seeing the published version. Each publish is kept (last 50) and can be restored as a new draft.
+- **Forms:** submissions are stored in the workspace and shown in the Responses tab, with CSV export (spreadsheet formulas are neutralised) and per-response deletion. Forms use plain HTML posts with a short-lived ticket, a honeypot field and a per-IP rate limit, so pages need no scripts. Responses are deleted automatically after 365 days, and each page holds at most 10,000.
+- **Results:** buttons and links go through a tracked redirect, so Studio shows scans next to taps and submissions. Only http(s), `tel:` and `mailto:` destinations are accepted.
+- **Privacy:** staff in the control room cannot read form responses; they are workspace data.
+- Images, videos and files must come from the workspace media library. A file used only by a draft or an older version is not protected from deletion; publishing re-checks every file.
+
 The PDF reader uses locally bundled [Mozilla PDF.js](https://mozilla.github.io/pdf.js/) resources (Apache-2.0). It renders pages with bounded canvases, provides accessible extracted text, and does not enable embedded document scripts, interactive forms, or annotations. Scanned documents need the original download for OCR or other editing tools. There is no external viewer or CDN dependency.
 
 Files are workspace-private in the library. Attaching them to a published page intentionally makes them available to anyone who opens its active short link. Public file requests require a short-lived, code-bound ticket and current publication status. Pausing/expiring the code prevents future file requests; already downloaded copies remain with their recipients. A ticket lasts 15 minutes; reopening the QR page renews it. Reader/file requests do not add scans. A final allowed scan can still load its document after reaching the campaign cap.
