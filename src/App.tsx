@@ -104,7 +104,9 @@ function Brand() {
     </div>
   );
 }
-function Auth({ setup, onSuccess }: { setup: boolean; onSuccess: () => void }) {
+function Auth({ setup, publicSignup = false, onSuccess }: { setup: boolean; publicSignup?: boolean; onSuccess: () => void }) {
+  const [register, setRegister] = useState(false);
+  const [notice, setNotice] = useState("");
   const [recoveryHelp, setRecoveryHelp] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -114,7 +116,12 @@ function Auth({ setup, onSuccess }: { setup: boolean; onSuccess: () => void }) {
     setError("");
     const form = new FormData(e.currentTarget);
     try {
-      await api(`/auth/${setup ? "setup" : "login"}`, Object.fromEntries(form));
+      const result = await api<{ verificationRequired?: boolean }>(`/auth/${setup ? "setup" : register ? "signup" : "login"}`, Object.fromEntries(form));
+      if (result.verificationRequired) {
+        setNotice("Check your email to confirm your account, then sign in.");
+        setRegister(false);
+        return;
+      }
       onSuccess();
     } catch (e) {
       setError((e as Error).message);
@@ -126,14 +133,14 @@ function Auth({ setup, onSuccess }: { setup: boolean; onSuccess: () => void }) {
     <Landing setup={setup} brand={<Brand />}>
       <div className="auth-form-wrap">
         <span className="small-label">OPENQR / YOUR CONNECTION STUDIO</span>
-        <h2>{setup ? "Make yourself at home." : "Welcome back."}</h2>
+        <h2>{setup || register ? "Make yourself at home." : "Welcome back."}</h2>
         <p>
-          {setup
+          {register ? "Create your Free account. Plus and Pro are coming soon." : setup
             ? "Create the owner account for your OpenQR workspace."
             : "Sign in and pick up where you left off."}
         </p>
         <form onSubmit={submit}>
-          {setup && (
+          {(setup || register) && (
             <label>
               Your name
               <input
@@ -172,17 +179,21 @@ function Auth({ setup, onSuccess }: { setup: boolean; onSuccess: () => void }) {
               {error}
             </div>
           )}
+          {notice && <p role="status">{notice}</p>}
           <button className="button primary full" disabled={busy}>
             {busy ? (
               <Loader2 size={18} className="spin" />
             ) : (
               <>
-                {setup ? "Create your workspace" : "Sign in"}
+                {setup || register ? "Create your workspace" : "Sign in"}
                 <ArrowRight size={18} />
               </>
             )}
           </button>
         </form>
+        {publicSignup && <button className="text-button" type="button" onClick={() => { setRegister(!register); setError(""); setNotice(""); }}>
+          {register ? "Already have an account? Sign in" : "New here? Create a Free account"}
+        </button>}
         {!setup && (
           <button
             className="text-button forgot-password"
@@ -197,7 +208,15 @@ function Auth({ setup, onSuccess }: { setup: boolean; onSuccess: () => void }) {
             onClose={() => setRecoveryHelp(false)}
           >
             <div className="simple-form">
-              <p>
+              {publicSignup ? <form onSubmit={async e => {
+                e.preventDefault();setBusy(true);setError("");
+                try { await api('/auth/recover', Object.fromEntries(new FormData(e.currentTarget)));setNotice('If that account exists, a recovery email is on its way.');setRecoveryHelp(false); }
+                catch(e){setError((e as Error).message);}finally{setBusy(false);}
+              }}>
+                <label>Email address<input name="email" type="email" autoComplete="email" required /></label>
+                {error && <p className="form-error" role="alert">{error}</p>}
+                <button className="button primary" disabled={busy}>Send recovery email</button>
+              </form> : <><p>
                 Ask your OpenQR server operator for a password recovery link.
                 The link works once and expires in 30 minutes. If you run this
                 server, follow the account recovery instructions in the project
@@ -208,13 +227,13 @@ function Auth({ setup, onSuccess }: { setup: boolean; onSuccess: () => void }) {
                 onClick={() => setRecoveryHelp(false)}
               >
                 Got it
-              </button>
+              </button></>}
             </div>
           </Modal>
         )}
         <div className="auth-note">
           <ShieldCheck size={17} />
-          <span>Self-hosted. No subscriptions. No scan limits.</span>
+          <span>{publicSignup ? "Free beta · No card required · Your workspace stays private." : "Self-hosted. No subscriptions. No scan limits."}</span>
         </div>
       </div>
     </Landing>
@@ -533,7 +552,7 @@ export default function App() {
       />
     );
   if (!auth.user)
-    return <Auth setup={auth.setupRequired} onSuccess={loadAuth} />;
+    return <Auth setup={auth.setupRequired} publicSignup={auth.publicSignup} onSuccess={loadAuth} />;
   const canEdit = mayEdit(auth.workspace?.role);
   const workspaceChanged = () => {
     generation.current++;

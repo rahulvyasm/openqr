@@ -123,6 +123,7 @@ export type Workspace = {
   role: Role;
 };
 export type AuthState = {
+  publicSignup?: boolean;
   operator?: boolean;
   operatorRole?: string | null;
   hosted?: boolean;
@@ -151,6 +152,7 @@ export type Analytics = {
 // The browser demo installs these so the real screens run without a server.
 export const demoHooks: {
   upload?: (file: File, kind?: "logo") => Promise<Asset>;
+  downloadBatch?: (ids: string[], format: "svg" | "png") => Promise<void>;
 } = {};
 export async function api<T>(
   path: string,
@@ -269,6 +271,7 @@ export async function downloadBatch(
   ids: string[],
   format: "svg" | "png" = "svg",
 ) {
+  if (demoHooks.downloadBatch) return demoHooks.downloadBatch(ids,format);
   const res = await fetch("/api/codes/export", {
     method: "POST",
     headers: { "Content-Type": "application/json" },

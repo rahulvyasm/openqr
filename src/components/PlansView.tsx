@@ -18,6 +18,8 @@ export type Plan = {
   members: number;
   monthlyINR: number | null;
   available?: boolean;
+  dynamicCodes?: number;
+  experiences?: number;
 };
 export type PlanSummary = {
   hosted: boolean;
@@ -198,6 +200,8 @@ export default function PlansView() {
                     </span>
                   </div>
                   <ul>
+                    {plan.dynamicCodes !== undefined && <li><Check size={14} />{plan.dynamicCodes} editable dynamic codes</li>}
+                    {plan.experiences !== undefined && <li><Check size={14} />{plan.experiences} published experience</li>}
                     <li>
                       <Check size={14} />
                       {formatNumber(plan.codes)} QR codes

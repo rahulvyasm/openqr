@@ -40,6 +40,19 @@ jobs:
         run: |
           npm run build
           npx playwright test visual/admin-access.spec.js
+  hosted:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Check hosted quotas, privacy, signup and admin controls
+        run: npm run test:hosted
   docker:
     runs-on: ubuntu-latest
     timeout-minutes: 15

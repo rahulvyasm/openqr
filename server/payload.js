@@ -1,6 +1,6 @@
 import { calendarEvent } from "../shared/calendar.js";
 import { z } from "zod";
-import { designSchema } from "./design.js";
+import { designSchema } from "../shared/design-schema.js";
 import {
   hostedTypes,
   pageOptionsSchema,

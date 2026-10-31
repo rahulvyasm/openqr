@@ -5,6 +5,11 @@ const PublicPdfViewer = React.lazy(
   () => import("./components/PublicPdfViewer"),
 );
 
+async function mount() {
+  if (import.meta.env.VITE_HOSTED === "true") {
+    try { await (await import('./hosted/browser')).prepareHosted(); }
+    catch (e) { document.getElementById('root')!.textContent=(e as Error).message;return; }
+  }
 createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     {location.pathname.startsWith("/view/") ? (
@@ -16,3 +21,5 @@ createRoot(document.getElementById("root")!).render(
     )}
   </React.StrictMode>,
 );
+}
+void mount();

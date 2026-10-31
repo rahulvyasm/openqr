@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { problem } from "./security.js";
+import { problem } from "../shared/errors.js";
 import { collectionTypes, validateCollection } from "./collections.js";
 import { validateExperience } from "./experience-blocks.js";
 import { socialLinkError, socialUrlKey } from "../shared/social.js";

@@ -1,6 +1,6 @@
 import { fileTypeFromBuffer } from "file-type";
 import { parseBuffer } from "music-metadata";
-import { problem } from "./security.js";
+import { problem } from "../shared/errors.js";
 export async function inspectMedia(bytes) {
   const detected = await fileTypeFromBuffer(bytes).catch(() => null);
   if (

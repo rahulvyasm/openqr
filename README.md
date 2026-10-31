@@ -6,6 +6,8 @@ A self-hosted, MIT-licensed QR workspace built with React, TypeScript, Express, 
 
 This is an independent implementation. It does not reuse QR Code Generator's code, branding, or assets, and is not affiliated with Bitly.
 
+A Cloudflare + Supabase hosted beta is also available for deployment, with Free accounts and administrator-granted Plus, Pro and Unlimited access. It has separate quotas and some feature differences; see the [hosted beta guide](docs/HOSTED_BETA.md) before using it for a public launch.
+
 ![OpenQR landing page](docs/landing.jpg)
 
 ## Try it in two minutes

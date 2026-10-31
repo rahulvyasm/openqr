@@ -12,4 +12,8 @@ public/pdfjs/
 test-results/
 playwright-report/
 dist-lite/
+dist-hosted/
+.hosted-build/
+.env.*.local
+.dev.vars*
 .shot*.mjs

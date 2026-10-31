@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { problem } from "./security.js";
+import { problem } from "../shared/errors.js";
 import { safeWebsite } from "./publishing.js";
 export const collectionTypes = [
   "gallery",
