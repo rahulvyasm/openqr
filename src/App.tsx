@@ -191,7 +191,7 @@ function Auth({ setup, publicSignup = false, onSuccess }: { setup: boolean; publ
             )}
           </button>
         </form>
-        {publicSignup && <button className="text-button" type="button" onClick={() => { setRegister(!register); setError(""); setNotice(""); }}>
+        {publicSignup && <button className="text-button auth-switch" type="button" onClick={() => { setRegister(!register); setError(""); setNotice(""); }}>
           {register ? "Already have an account? Sign in" : "New here? Create a Free account"}
         </button>}
         {!setup && (

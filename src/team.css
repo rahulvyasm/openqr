@@ -513,8 +513,23 @@
 .forgot-password {
   justify-content: center;
   width: 100%;
-  font-size: 10px;
+  font-size: 12px;
   margin-top: 18px;
+}
+.text-button.auth-switch {
+  justify-content: center;
+  width: 100%;
+  margin: 18px 0 0;
+  padding: 8px 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #d8f46b;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.text-button.auth-switch:hover,
+.text-button.auth-switch:focus-visible {
+  color: #eaffa0;
 }
 .access-card .info-note {
   display: block;
