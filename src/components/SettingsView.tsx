@@ -53,12 +53,14 @@ export default function SettingsView({
   onSignOut,
   notify,
   initialTab = "team",
+  onTabChange,
 }: {
   auth: AuthState;
   onAuthChange: () => void;
   onSignOut: () => void;
   notify: (s: string) => void;
   initialTab?: string;
+  onTabChange?: (tab: string) => void;
 }) {
   const [tab, setTab] = useState(initialTab),
     [events, setEvents] = useState<Audit[]>([]),
@@ -99,7 +101,10 @@ export default function SettingsView({
           <button
             key={id}
             className={tab === id ? "active" : ""}
-            onClick={() => setTab(id)}
+            onClick={() => {
+              setTab(id);
+              onTabChange?.(id);
+            }}
           >
             <Icon size={16} />
             {label}

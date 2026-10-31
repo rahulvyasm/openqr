@@ -288,18 +288,31 @@ export async function identity(backend, req, headers) {
       access,
       user: { id: user.id, email: user.email },
     };
-  await backend.rpc("oq_bootstrap", {
-    p_actor: user.id,
-    p_name: user.user_metadata?.name || user.email.split("@")[0],
-  });
-  const account = (await backend.db("oq_accounts", `id=eq.${user.id}`))[0];
+  const records = () =>
+    Promise.all([
+      backend.db("oq_accounts", `id=eq.${user.id}`),
+      backend.db("oq_staff", `user_id=eq.${user.id}`),
+      backend.db(
+        "oq_members",
+        `user_id=eq.${user.id}&select=*,oq_workspaces(id,name,owner_id)`,
+      ),
+    ]);
+  let [accounts, staffRows, memberships] = await records();
+  // Only a first visit, or an account that owns no workspace, needs the setup step.
+  if (
+    !accounts[0] ||
+    !memberships.some((m) => m.oq_workspaces?.owner_id === user.id)
+  ) {
+    await backend.rpc("oq_bootstrap", {
+      p_actor: user.id,
+      p_name: user.user_metadata?.name || user.email.split("@")[0],
+    });
+    [accounts, staffRows, memberships] = await records();
+  }
+  const account = accounts[0];
   if (!account || account.suspended)
     throw problem("This account is suspended. Contact support.", 403);
-  const staff = (await backend.db("oq_staff", `user_id=eq.${user.id}`))[0];
-  const memberships = await backend.db(
-    "oq_members",
-    `user_id=eq.${user.id}&select=*,oq_workspaces(id,name,owner_id)`,
-  );
+  const staff = staffRows[0];
   const workspaces = memberships.map((m) => ({
     id: m.workspace_id,
     name: m.oq_workspaces.name,

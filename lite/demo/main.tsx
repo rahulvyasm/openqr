@@ -7,7 +7,7 @@ import App from "../../src/App";
 installMockApi();
 createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <App />
+    <App urlRouting={false} />
     <div className="demo-bar" role="note">
       <b>LIVE DEMO</b>
       <span>Everything here works. Nothing is saved or sent.</span>

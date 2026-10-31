@@ -52,28 +52,21 @@ import "./advanced.css";
 import "./team.css";
 import "./publishing.css";
 import "./collections.css";
-import MediaLibrary from "./components/MediaLibrary";
 import AccessFlow, {
   readAccessLink,
   type AccessLink,
 } from "./components/AccessFlow";
 import WorkspaceSwitcher from "./components/WorkspaceSwitcher";
 import GithubLink from "./components/GithubLink";
-import SettingsView from "./components/SettingsView";
 import Modal from "./components/Modal";
 import QrImage from "./components/QrImage";
-import Editor from "./components/Editor";
-import ExperienceStudio from "./components/ExperienceStudio";
-import BulkImport from "./components/BulkImport";
-import DesignStudio from "./components/DesignStudio";
 import BatchBar from "./components/BatchBar";
 import DownloadDialog from "./components/DownloadDialog";
-import AnalyticsDetails from "./components/AnalyticsDetails";
 import StudioHero, { type StudioDraft } from "./components/StudioHero";
 import CommandMenu from "./components/CommandMenu";
 import CampaignPulse from "./components/CampaignPulse";
 import ProfileMenu from "./components/ProfileMenu";
-import PlansView from "./components/PlansView";
+import { parseRoute, pathFor } from "./routes";
 import Landing from "./components/Landing";
 import { pageIn, startMotion } from "./motion";
 import ScanChart from "./components/ScanChart";
@@ -87,8 +80,32 @@ import "@fontsource/geist-mono/latin-500.css";
 import "./design.css";
 import "./experience.css";
 import { typeIcons as icons } from "./components/codeTypes";
-const OperatorConsole = React.lazy(
-  () => import("./components/OperatorConsole"),
+// Each page and heavy dialog is its own chunk, fetched when first needed.
+const loaders = {
+  operator: () => import("./components/OperatorConsole"),
+  media: () => import("./components/MediaLibrary"),
+  settings: () => import("./components/SettingsView"),
+  designs: () => import("./components/DesignStudio"),
+  plans: () => import("./components/PlansView"),
+  editor: () => import("./components/Editor"),
+  studio: () => import("./components/ExperienceStudio"),
+  bulk: () => import("./components/BulkImport"),
+  details: () => import("./components/AnalyticsDetails"),
+};
+const OperatorConsole = React.lazy(loaders.operator);
+const MediaLibrary = React.lazy(loaders.media);
+const SettingsView = React.lazy(loaders.settings);
+const DesignStudio = React.lazy(loaders.designs);
+const PlansView = React.lazy(loaders.plans);
+const Editor = React.lazy(loaders.editor);
+const ExperienceStudio = React.lazy(loaders.studio);
+const BulkImport = React.lazy(loaders.bulk);
+const AnalyticsDetails = React.lazy(loaders.details);
+const PageLoading = () => (
+  <div className="operator-loading">
+    <Loader2 className="spin" />
+    Loading…
+  </div>
 );
 
 function Brand() {
@@ -302,7 +319,12 @@ function Auth({ setup, publicSignup = false, mfaRequired = false, onSuccess }: {
     </Landing>
   );
 }
-export default function App() {
+export default function App({ urlRouting = true }: { urlRouting?: boolean }) {
+  const startRoute = useRef(
+    urlRouting
+      ? parseRoute(window.location.pathname)
+      : { page: "codes", folder: "", settingsTab: "team" },
+  ).current;
   useEffect(() => startMotion(), []);
   const [auth, setAuth] = useState<AuthState | null>(null);
   const [accessLink, setAccessLink] = useState<AccessLink | null>(
@@ -315,10 +337,8 @@ export default function App() {
   const [folders, setFolders] = useState<Folder[]>([]);
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
   const [days, setDays] = useState(30);
-  const [page, setPage] = useState(() =>
-    window.location.pathname === "/control-room" ? "operator" : "codes",
-  );
-  const [settingsTab, setSettingsTab] = useState("team");
+  const [page, setPage] = useState(startRoute.page);
+  const [settingsTab, setSettingsTab] = useState(startRoute.settingsTab);
   const [settingsVisit, setSettingsVisit] = useState(0);
   const [supportAlerts, setSupportAlerts] = useState({ staff: 0, mine: 0 });
   useEffect(() => {
@@ -345,7 +365,7 @@ export default function App() {
       window.removeEventListener("support-changed", load);
     };
   }, [auth?.user, auth?.operator]);
-  const [folder, setFolder] = useState("");
+  const [folder, setFolder] = useState(startRoute.folder);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("all");
   const [view, setView] = useState("list");
@@ -444,11 +464,22 @@ export default function App() {
       });
   };
   const notify = (text: string) => setToast(text);
+  // Switches page without adding a history entry, keeping the address in step.
+  const showPage = (next: string, f = "", tab = settingsTab) => {
+    if (urlRouting) {
+      const path = pathFor(next, f, tab);
+      if (window.location.pathname !== path)
+        window.history.replaceState(null, "", path);
+    }
+    setPage(next);
+  };
   const loadAuth = () =>
     api<AuthState>("/auth/status")
       .then((data) => {
         const scope = `${data.user?.id || ""}/${data.workspace?.id || ""}`;
         if (scope !== scopeId.current) {
+          // The first load keeps the folder that the address asked for.
+          const first = !scopeId.current;
           generation.current++;
           scopeId.current = scope;
           setCodes([]);
@@ -456,21 +487,24 @@ export default function App() {
           setTemplates([]);
           setAnalytics(null);
           setSelection([]);
-          setFolder("");
+          if (!first) setFolder("");
           setDetail(null);
           setEditor(null);
           setCommandOpen(false);
           setDraft(undefined);
         }
         setAuth(data);
-        if (
-          data.user &&
-          !data.operator &&
-          window.location.pathname === "/control-room"
-        ) {
-          window.history.replaceState(null, "", "/");
-          setPage("codes");
-        } else if (data.operator && !data.workspace) setPage("operator");
+        const onControlRoom =
+          urlRouting && parseRoute(window.location.pathname).page === "operator";
+        if (data.user && !data.operator && onControlRoom) showPage("codes");
+        else if (data.operator && !data.workspace) showPage("operator");
+        else if (urlRouting && data.user) {
+          // Turn an unknown address into the page it actually shows.
+          const route = parseRoute(window.location.pathname);
+          const canonical = pathFor(route.page, route.folder, route.settingsTab);
+          if (window.location.pathname.replace(/\/+$/, "") !== canonical.replace(/\/+$/, ""))
+            window.history.replaceState(null, "", canonical);
+        }
       })
       .catch((e) => setBootError(e.message));
   const refresh = async () => {
@@ -503,9 +537,16 @@ export default function App() {
   useEffect(() => {
     loadAuth();
     const fromRoute = () => {
-      setPage(
-        window.location.pathname === "/control-room" ? "operator" : "codes",
-      );
+      if (!urlRouting) return;
+      const route = parseRoute(window.location.pathname);
+      setPage(route.page);
+      setFolder(route.folder);
+      setSelection([]);
+      if (route.page === "settings") {
+        setSettingsTab(route.settingsTab);
+        setSettingsVisit((v) => v + 1);
+      }
+      window.scrollTo(0, 0);
       setMobileNav(false);
     };
     window.addEventListener("popstate", fromRoute);
@@ -545,10 +586,33 @@ export default function App() {
   useEffect(() => {
     if (auth?.user && auth.workspace) {
       refresh();
-      loadAnalytics();
+      // Scan statistics are only drawn on these two pages.
+      if (page === "codes" || page === "analytics") loadAnalytics();
       loadTemplates();
     }
   }, [auth?.user?.id, auth?.workspace?.id, auth?.workspace?.role, days]);
+  useEffect(() => {
+    // Only platform staff have a control room.
+    if (page === "operator" && auth?.user && !auth.operator) showPage("codes");
+  }, [page, auth?.user?.id, auth?.operator]);
+  useEffect(() => {
+    if (
+      (page === "codes" || page === "analytics") &&
+      auth?.user &&
+      auth.workspace &&
+      !analytics
+    )
+      void loadAnalytics();
+  }, [page]);
+  useEffect(() => {
+    if (!auth?.user) return;
+    // Fetch the other pages quietly once this one has settled.
+    const timer = window.setTimeout(() => {
+      for (const [name, load] of Object.entries(loaders))
+        if (name !== "operator" || auth.operator) void load().catch(() => {});
+    }, 2000);
+    return () => window.clearTimeout(timer);
+  }, [auth?.user?.id]);
   useEffect(() => {
     if (!toast) return;
     const timer = setTimeout(() => setToast(""), 4000);
@@ -609,7 +673,7 @@ export default function App() {
         onAuthChange={loadAuth}
         onDone={() => {
           setAccessLink(null);
-          setPage("codes");
+          showPage("codes");
           loadAuth();
         }}
       />
@@ -627,7 +691,7 @@ export default function App() {
     setFolder("");
     setEditor(null);
     setDetail(null);
-    setPage("codes");
+    showPage("codes");
     loadAuth();
   };
   const signOut = async () => {
@@ -687,10 +751,12 @@ export default function App() {
     setInitialDesign(undefined);
     setEditor("new");
   };
-  const navigate = (next: string, f = "") => {
-    const nextPath = next === "operator" ? "/control-room" : "/";
-    if (window.location.pathname !== nextPath)
-      window.history.pushState(null, "", nextPath);
+  const navigate = (next: string, f = "", tab = settingsTab) => {
+    if (urlRouting) {
+      const nextPath = pathFor(next, f, tab);
+      if (window.location.pathname !== nextPath)
+        window.history.pushState(null, "", nextPath);
+    }
     window.scrollTo(0, 0);
     setPage(next);
     setSelection([]);
@@ -958,17 +1024,17 @@ export default function App() {
             onAccount={() => {
               setSettingsTab("account");
               setSettingsVisit((v) => v + 1);
-              navigate("settings");
+              navigate("settings", "", "account");
             }}
             onWorkspace={() => {
               setSettingsTab("workspace");
               setSettingsVisit((v) => v + 1);
-              navigate("settings");
+              navigate("settings", "", "workspace");
             }}
             onTeam={() => {
               setSettingsTab("team");
               setSettingsVisit((v) => v + 1);
-              navigate("settings");
+              navigate("settings", "", "team");
             }}
             onSignOut={signOut}
           />
@@ -1011,6 +1077,7 @@ export default function App() {
           </span>
         </header>
         <main className="main-content" key={page} ref={pageIn}>
+          <React.Suspense fallback={<PageLoading />}>
           {page === "operator" && auth.operator ? (
             <React.Suspense
               fallback={
@@ -1053,6 +1120,10 @@ export default function App() {
               onAuthChange={loadAuth}
               onSignOut={signOut}
               notify={notify}
+              onTabChange={(t) => {
+                if (urlRouting)
+                  window.history.pushState(null, "", pathFor("settings", "", t));
+              }}
             />
           ) : (
             <>
@@ -1687,6 +1758,7 @@ export default function App() {
               {" "}Crafted for the open web
             </span>
           </footer>
+          </React.Suspense>
         </main>
       </div>
       {commandOpen && (
@@ -1707,6 +1779,7 @@ export default function App() {
           onClose={() => setCommandOpen(false)}
         />
       )}
+      <React.Suspense fallback={null}>
       {editor && (
         <Editor
           code={editor === "new" ? undefined : editor}
@@ -1731,7 +1804,7 @@ export default function App() {
               setStudio(saved);
             setEditor(null);
             setDraft(undefined);
-            setPage("codes");
+            showPage("codes");
             refresh();
             loadAnalytics();
           }}
@@ -1764,6 +1837,7 @@ export default function App() {
           }}
         />
       )}
+      </React.Suspense>
       {download && (
         <DownloadDialog code={download} onClose={() => setDownload(null)} />
       )}
@@ -1860,7 +1934,9 @@ export default function App() {
               </button>
             </div>
             {analyticsPanel(detailData)}
-            <AnalyticsDetails data={detailData} onCode={() => {}} />
+            <React.Suspense fallback={null}>
+              <AnalyticsDetails data={detailData} onCode={() => {}} />
+            </React.Suspense>
             <p className="hint">
               Times are grouped by UTC date. Visits to the tracking link count
               as scans; bots may be included.
