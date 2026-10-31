@@ -11,6 +11,7 @@ const all = [
   "cases:manage",
   "accounts:manage",
   "audit:read",
+  "entitlements:override",
 ];
 export const staffRoles = [
   {

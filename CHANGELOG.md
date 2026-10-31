@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Rename hosted tiers to Free, Plus and Pro, hide prices and show Plus/Pro as coming soon. Preserve existing Creator/Business grants. Add Super Admin account grants (Free, Plus, Pro or Unlimited) that apply to current and future owned workspaces. Require password confirmation and a recorded reason, and audit each change atomically. Unlimited removes product quotas while retaining file-size, permission and rate limits.
+
 - Add a static **lite site**: a free in-browser QR generator (ten static code types, the full designer, PNG and SVG downloads, nothing uploaded) and a **See full potential** button that opens the real app against an in-browser mock server for an interactive demo. Includes an optional Supabase-backed early-access list, deployment files for Vercel, Cloudflare Pages and Netlify, browser tests (`npm run test:e2e`) and a CI job. See `docs/LITE_SITE.md`.
 
 ## 1.0.0 — 2026-10-30

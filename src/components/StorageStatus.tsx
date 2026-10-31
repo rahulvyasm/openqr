@@ -21,9 +21,11 @@ type Backup = {
   remoteEnabled: boolean;
 };
 const bytes = (value: number) =>
-  value >= 1024 ** 3
-    ? `${(value / 1024 ** 3).toFixed(2)} GB`
-    : `${(value / 1024 ** 2).toLocaleString(undefined, { maximumFractionDigits: 2 })} MB`;
+  value === Number.MAX_SAFE_INTEGER
+    ? "No plan cap"
+    : value >= 1024 ** 3
+      ? `${(value / 1024 ** 3).toFixed(2)} GB`
+      : `${(value / 1024 ** 2).toLocaleString(undefined, { maximumFractionDigits: 2 })} MB`;
 const when = (value?: string | null) =>
   value ? new Date(value).toLocaleString() : "None recorded";
 
@@ -92,17 +94,21 @@ export default function StorageStatus({ manager }: { manager: boolean }) {
         <>
           <div className="storage-usage">
             <span>
-              {bytes(storage.usedBytes)} of {bytes(storage.limitBytes)} used ·{" "}
-              {Math.round(ratio * 100)}%
+              {bytes(storage.usedBytes)} used ·{" "}
+              {storage.limitBytes === Number.MAX_SAFE_INTEGER
+                ? "No plan cap"
+                : `${bytes(storage.limitBytes)} available · ${Math.round(ratio * 100)}%`}
             </span>
             <span>
               {storage.backend === "s3" ? "Object storage" : "Local storage"}
             </span>
-            <progress
-              aria-label="Workspace storage used"
-              value={Math.min(storage.usedBytes, storage.limitBytes)}
-              max={storage.limitBytes}
-            />
+            {storage.limitBytes !== Number.MAX_SAFE_INTEGER && (
+              <progress
+                aria-label="Workspace storage used"
+                value={Math.min(storage.usedBytes, storage.limitBytes)}
+                max={storage.limitBytes}
+              />
+            )}
           </div>
           <p className="hint">
             Maximum upload: {bytes(storage.maxUploadBytes)}. File types may have

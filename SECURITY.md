@@ -1,5 +1,12 @@
 # Security
 
+Account subscription grants are independent of company staff roles. Only a
+Super Admin can grant account-wide Free, Plus, Pro or Unlimited access, with a
+password recheck and a recorded reason. Grants apply only to workspaces owned
+by the recipient and follow current ownership. A product grant never grants
+access to the control room. Unlimited bypasses subscription quotas, not
+authorization, upload size restrictions, rate limiting or physical capacity.
+
 OpenQR is early software for invited teams on a trusted, self-hosted server. It implements workspace membership/role authorization, server-side sessions, and operator-managed recovery. It has not received an independent security audit. SSO, two-factor authentication, email-address verification/change flows, and public self-service signup are not implemented.
 
 For a vulnerability, use GitHub's private vulnerability reporting feature on the repository where this project is published, if enabled. Do not disclose passwords, cookies, database files, or exploitable details in a public issue. Repository owners should enable private reporting before accepting public users.

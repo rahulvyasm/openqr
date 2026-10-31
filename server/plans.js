@@ -1,18 +1,18 @@
 import { z } from "zod";
 import { rateLimit } from "express-rate-limit";
-import { hostedPlans } from "../shared/plans.js";
+import { hostedPlans, canonicalTier } from "../shared/plans.js";
 import { atomic, audit, passwordMatches, problem } from "./security.js";
 import { requireStaffAccess } from "./operator.js";
+import { accountAccess } from "./account-access.js";
 
 export function createEntitlements(db, storage, hosting = {}) {
   const enabled = !!hosting.enabled;
-  const prices = {
-    free: 0,
-    creator: hosting.creatorINR ?? null,
-    business: hosting.businessINR ?? null,
-  };
   const catalog = () =>
-    hostedPlans.map((plan) => ({ ...plan, monthlyINR: prices[plan.id] }));
+    hostedPlans.map((plan) => ({
+      ...plan,
+      monthlyINR: null,
+      available: plan.id === "free",
+    }));
   const record = (workspaceId) => {
     try {
       return JSON.parse(
@@ -25,13 +25,25 @@ export function createEntitlements(db, storage, hosting = {}) {
     }
   };
   const plan = (workspaceId) => {
-    const saved = record(workspaceId),
+    const owner = db
+      .prepare("SELECT owner_id FROM workspaces WHERE id=?")
+      .get(workspaceId);
+    const grant = owner ? accountAccess(db, owner.owner_id) : null;
+    const saved = grant || record(workspaceId),
       effective =
         saved && ["active", "trialing"].includes(saved.status)
-          ? saved.tier
+          ? canonicalTier(saved.tier)
           : "free";
     const tier =
-      hostedPlans.find((plan) => plan.id === effective) || hostedPlans[0];
+      effective === "unlimited"
+        ? {
+            id: "unlimited",
+            name: "Unlimited",
+            codes: null,
+            members: null,
+            storageBytes: Number.MAX_SAFE_INTEGER,
+          }
+        : hostedPlans.find((plan) => plan.id === effective) || hostedPlans[0];
     return enabled
       ? {
           ...tier,
@@ -106,6 +118,7 @@ export function createEntitlements(db, storage, hosting = {}) {
       );
   };
   const assertWorkspaceCreate = (userId) => {
+    if (accountAccess(db, userId)?.tier === "unlimited") return;
     if (
       enabled &&
       db
@@ -117,17 +130,23 @@ export function createEntitlements(db, storage, hosting = {}) {
         402,
       );
   };
-  const summary = (workspaceId) => ({
-    hosted: enabled,
-    currency: "INR",
-    current: plan(workspaceId),
-    usage: usage(workspaceId),
-    plans: catalog(),
-    checkoutAvailable: false,
-    checkoutMessage:
-      "Online checkout is not configured. No payment is collected by this installation.",
-    maxOwnedWorkspaces: enabled ? (hosting.maxOwnedWorkspaces ?? 3) : null,
-  });
+  const summary = (workspaceId) => {
+    const current = plan(workspaceId);
+    return {
+      hosted: enabled,
+      currency: "INR",
+      current,
+      usage: usage(workspaceId),
+      plans: catalog(),
+      checkoutAvailable: false,
+      checkoutMessage:
+        "Free is available now. Plus and Pro are coming soon. Access can be granted by the service administrator.",
+      maxOwnedWorkspaces:
+        enabled && current.id !== "unlimited"
+          ? (hosting.maxOwnedWorkspaces ?? 3)
+          : null,
+    };
+  };
   return {
     enabled,
     plan,
@@ -149,7 +168,7 @@ export function registerPlanRoutes(app, db, entitlements) {
 }
 export function registerPlanAdminRoutes(app, db, entitlements) {
   app.get("/api/operator/plans", (req, res) => {
-    requireStaffAccess(db, req, "billing:manage");
+    const role = requireStaffAccess(db, req, "billing:manage");
     const q = z
         .string()
         .max(100)
@@ -163,23 +182,27 @@ export function registerPlanAdminRoutes(app, db, entitlements) {
       search = `%${q}%`;
     const rows = db
       .prepare(
-        "SELECT id,name FROM workspaces WHERE name LIKE ? ORDER BY created_at DESC,id LIMIT 25 OFFSET ?",
+        "SELECT w.id,w.name,w.owner_id AS ownerId,u.name AS ownerName FROM workspaces w JOIN users u ON u.id=w.owner_id WHERE w.name LIKE ? OR u.name LIKE ? ORDER BY w.created_at DESC,w.id LIMIT 25 OFFSET ?",
       )
-      .all(search, page * 25)
+      .all(search, search, page * 25)
       .map((workspace) => ({
         ...workspace,
         ...entitlements.summary(workspace.id),
+        accountAccess: accountAccess(db, workspace.ownerId),
       }));
     res.json({
       rows,
       total: db
-        .prepare("SELECT COUNT(*) n FROM workspaces WHERE name LIKE ?")
-        .get(search).n,
+        .prepare(
+          "SELECT COUNT(*) n FROM workspaces w JOIN users u ON u.id=w.owner_id WHERE w.name LIKE ? OR u.name LIKE ?",
+        )
+        .get(search, search).n,
       page,
       pageSize: 25,
       plans: entitlements.catalog(),
       hosted: entitlements.enabled,
       currency: "INR",
+      canGrantAccountAccess: role === "super_admin",
     });
   });
   app.post(
@@ -195,7 +218,9 @@ export function registerPlanAdminRoutes(app, db, entitlements) {
       requireStaffAccess(db, req, "billing:manage");
       const input = z
         .object({
-          tier: z.enum(hostedPlans.map((plan) => plan.id)),
+          tier: z
+            .enum(["free", "plus", "pro", "creator", "business"])
+            .transform(canonicalTier),
           status: z.enum(["active", "trialing", "canceled"]).default("active"),
           password: z.string().min(1).max(128),
         })
@@ -217,6 +242,14 @@ export function registerPlanAdminRoutes(app, db, entitlements) {
         )
           throw problem("Workspace not found.", 404);
         const before = entitlements.plan(req.params.id);
+        const owner = db
+          .prepare("SELECT owner_id FROM workspaces WHERE id=?")
+          .get(req.params.id);
+        if (accountAccess(db, owner.owner_id))
+          throw problem(
+            "This workspace follows an account grant. A Super Admin must change or remove that grant first.",
+            409,
+          );
         db.prepare("INSERT OR REPLACE INTO config(key,value) VALUES (?,?)").run(
           `subscription:${req.params.id}`,
           JSON.stringify({

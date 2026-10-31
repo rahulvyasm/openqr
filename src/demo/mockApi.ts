@@ -431,7 +431,7 @@ on("GET", "/billing", () =>
     usage: { codes: codes.length, members: 3, storageBytes: 3_400_000, pendingInvites: 1 },
     plans: hostedPlans.map((p: any) => ({ ...p, monthlyINR: null })),
     checkoutAvailable: false,
-    checkoutMessage: "Checkout is not part of the demo. Prices are announced at launch.",
+    checkoutMessage: "Free is available now. Plus and Pro are coming soon.",
     maxOwnedWorkspaces: 3,
   }),
 );

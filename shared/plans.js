@@ -8,19 +8,23 @@ export const hostedPlans = [
     members: 3,
   },
   {
-    id: "creator",
-    name: "Creator",
+    id: "plus",
+    name: "Plus",
     description: "Room to launch, learn, and grow.",
     codes: 1000,
     storageBytes: 5 * 1024 ** 3,
     members: 10,
   },
   {
-    id: "business",
-    name: "Business",
+    id: "pro",
+    name: "Pro",
     description: "More space for ambitious teams.",
     codes: 10000,
     storageBytes: 50 * 1024 ** 3,
     members: 50,
   },
 ];
+
+// Retain existing grants when an installation upgrades from the old tier names.
+export const canonicalTier = (tier) =>
+  ({ creator: "plus", business: "pro" })[tier] || tier;

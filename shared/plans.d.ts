@@ -6,3 +6,4 @@ export const hostedPlans: {
   storageBytes: number;
   members: number;
 }[];
+export function canonicalTier(tier: string): string;

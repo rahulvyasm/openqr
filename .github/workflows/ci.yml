@@ -36,6 +36,10 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - name: Build the free generator and demo, then test them in a browser
         run: npm run test:e2e
+      - name: Verify Super Admin account grants in a browser
+        run: |
+          npm run build
+          npx playwright test visual/admin-access.spec.js
   docker:
     runs-on: ubuntu-latest
     timeout-minutes: 15

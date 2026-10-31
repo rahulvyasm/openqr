@@ -426,7 +426,7 @@ Back up your complete DATA_DIR and preserve your public domain. Stop the server 
 
 ## Scope and roadmap
 
-### Hosted tiers and INR pricing
+### Hosted tiers and administrator grants
 
 The self-hosted edition includes all features without hosted QR/team plan caps.
 To operate a managed service, set `HOSTED_MODE=true`. Each workspace then receives
@@ -435,13 +435,12 @@ a hosted tier with the same feature set and different resource limits:
 | Tier | QR codes | Media storage | Team seats |
 | --- | ---: | ---: | ---: |
 | Free | 25 | 100 MB | 3 |
-| Creator | 1,000 | 5 GB | 10 |
-| Business | 10,000 | 50 GB | 50 |
+| Plus · coming soon | 1,000 | 5 GB | 10 |
+| Pro · coming soon | 10,000 | 50 GB | 50 |
 
-These initial tier limits live in `shared/plans.js`. Set display prices in whole
-INR per workspace/month using `PLAN_CREATOR_MONTHLY_INR` and
-`PLAN_BUSINESS_MONTHLY_INR`. Prices are unannounced until configured. For Docker,
-also pass those optional price variables to the container in `compose.yaml`.
+These initial tier limits live in `shared/plans.js`. Prices are not published,
+and Plus and Pro are shown as **Coming soon**. Checkout is disabled. Legacy
+Creator and Business grants continue as Plus and Pro; existing printed links stay the same.
 `HOSTED_MAX_OWNED_WORKSPACES` defaults to 3 per account, independently of tier limits.
 Pending invitations reserve team seats; acceptance rechecks capacity after a downgrade.
 
@@ -459,6 +458,22 @@ above the new limit; it never deletes saved content or pauses existing printed l
 Hosted storage limits replace the self-hosted `WORKSPACE_STORAGE_MB` quota;
 per-file upload limits still apply to every plan. Staff privileges and workspace
 plans are independent: a paid plan never grants company control-room access.
+
+**Super Admin account grants:** under **Control room → Billing → Account access**,
+choose Free, Plus, Pro, or Unlimited for the workspace owner. Account grants apply
+to all workspaces that person owns, including ones created later. They do not
+apply to workspaces they only belong to, and do not grant staff permissions.
+Only a Super Admin can change account grants. Each change requires the actor's
+password and a reason and is recorded in the staff audit log. Choose **Remove
+account grant** to return to normal workspace plans. Existing content is kept.
+
+For personal use, grant your own account **Unlimited**. This removes subscription
+quotas on codes, team seats, media storage and owned workspace counts. File-size
+limits, permission checks, rate limits and actual hosting capacity still apply.
+It does not expand a free provider's storage or bandwidth. Bootstrap staff access
+on the server with `npm run operator -- grant --email your-account@example.com`;
+public signup must never create staff roles. The Cloudflare/Supabase account
+migration is separate work; the static lite site still runs without real accounts.
 
 OpenQR supports multiple workspaces and invited teams on a single self-hosted SQLite instance. The [roadmap](docs/ROADMAP.md) lists what is parked for later, including custom domains, API keys, payment collection for hosted plans, and PostgreSQL-backed hosted operations. See the [production readiness checklist](docs/PRODUCTION_READINESS.md) for what is and is not covered, and [SECURITY.md](SECURITY.md) before exposing an instance publicly.
 

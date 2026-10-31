@@ -14,6 +14,7 @@ import { access, problem, canManage } from "./security.js";
 import { readBackupStatus } from "./backup-status.js";
 import { registerOperatorRoutes } from "./operator.js";
 import { registerSupportRoutes } from "./support.js";
+import { registerAccountAccessRoutes } from "./account-access.js";
 import { migrateExperiences, registerExperienceRoutes } from "./experience.js";
 import { createNotifier } from "./notify.js";
 import {
@@ -182,6 +183,7 @@ export function createApp({
   registerPlanAdminRoutes(app, db, entitlements);
   const alerts = notifier || createNotifier(notifications, origin);
   registerSupportRoutes(app, db, entitlements, alerts);
+  registerAccountAccessRoutes(app, db, entitlements);
   registerWorkspaceRoutes(app, db, origin, entitlements);
   app.use("/api", (req, _res, next) => {
     if (!req.workspace)

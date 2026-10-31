@@ -22,7 +22,7 @@ export type StorageSummary = {
   backend: string;
 };
 const sizeLabel = (size: number) =>
-  size >= 1048576
+  size === Number.MAX_SAFE_INTEGER ? "No plan cap" : size >= 1048576
     ? `${(size / 1048576).toFixed(1)} MB`
     : `${Math.max(1, Math.round(size / 1024))} KB`;
 const matches = (asset: Asset, filter?: AssetFilter) =>
@@ -216,17 +216,17 @@ export function AssetBrowser({
       {summary && (
         <div className="storage-usage">
           <span>
-            {sizeLabel(summary.usedBytes)} of {sizeLabel(summary.limitBytes)}{" "}
-            used
+            {sizeLabel(summary.usedBytes)} used · {summary.limitBytes === Number.MAX_SAFE_INTEGER
+              ? "No plan cap" : `${sizeLabel(summary.limitBytes)} available`}
           </span>
           <span>
             {summary.backend === "s3" ? "Object storage" : "Local storage"}
           </span>
-          <progress
+          {summary.limitBytes !== Number.MAX_SAFE_INTEGER && <progress
             aria-label="Workspace storage used"
             value={summary.usedBytes}
             max={summary.limitBytes}
-          />
+          />}
         </div>
       )}
       {busy && (

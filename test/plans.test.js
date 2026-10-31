@@ -29,8 +29,8 @@ test("hosted code caps are atomic across creation, duplication and bulk imports 
   assert.equal(summary.current.codes, 25);
   assert.equal(summary.checkoutAvailable, false);
   assert.equal(
-    summary.plans.find((plan) => plan.id === "creator").monthlyINR,
-    499,
+    summary.plans.find((plan) => plan.id === "plus").monthlyINR,
+    null,
   );
   const batch = await request("/api/codes/bulk", {
     method: "POST",
@@ -89,7 +89,7 @@ test("hosted code caps are atomic across creation, duplication and bulk imports 
   );
 });
 
-test("only authorized company billing staff can provision INR tiers, and cancellation preserves printed links", async (t) => {
+test("only authorized company billing staff can provision manual tiers, and cancellation preserves printed links", async (t) => {
   const app = await hosted(t),
     { request, db } = app,
     owner = db.prepare("SELECT id FROM users").get();
@@ -232,7 +232,7 @@ test("hosted storage limits follow the current tier and self-hosted QR and team 
   assert.equal(summary.current.codes, null);
   assert.equal(summary.current.members, null);
   assert.equal(
-    summary.plans.find((plan) => plan.id === "creator").monthlyINR,
+    summary.plans.find((plan) => plan.id === "plus").monthlyINR,
     null,
   );
   assert.equal(

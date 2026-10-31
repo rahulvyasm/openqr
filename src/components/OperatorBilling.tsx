@@ -3,7 +3,13 @@ import { CreditCard, Loader2, Search } from "lucide-react";
 import { api } from "../lib";
 import Modal from "./Modal";
 import { planSize, type Plan, type PlanSummary } from "./PlansView";
-type Row = PlanSummary & { id: string; name: string };
+type Row = PlanSummary & {
+  id: string;
+  name: string;
+  ownerId: string;
+  ownerName: string;
+  accountAccess: { tier: string } | null;
+};
 type Catalog = {
   rows: Row[];
   total: number;
@@ -12,6 +18,7 @@ type Catalog = {
   plans: Plan[];
   hosted: boolean;
   currency: string;
+  canGrantAccountAccess: boolean;
 };
 export default function OperatorBilling({
   onChange,
@@ -24,6 +31,7 @@ export default function OperatorBilling({
     [revision, setRevision] = useState(0),
     [error, setError] = useState(""),
     [target, setTarget] = useState<Row | null>(null),
+    [account, setAccount] = useState<Row | null>(null),
     [busy, setBusy] = useState(false);
   useEffect(() => {
     let active = true;
@@ -62,14 +70,15 @@ export default function OperatorBilling({
               setQuery(e.target.value);
               setPage(0);
             }}
-            placeholder="Find a workspace…"
+            placeholder="Find an owner or workspace…"
             maxLength={100}
           />
         </label>
       </div>
       <p className="hint">
-        Currency: INR. Online checkout is not configured. This screen provisions
-        access; it does not collect money or mark invoices as paid.
+        Grant access without collecting payment. Account grants apply to every
+        workspace that person owns, including new ones. Only Super Admins can
+        change account grants or assign unlimited access.
       </p>
       {data && !data.hosted && (
         <div className="info-note">
@@ -103,6 +112,7 @@ export default function OperatorBilling({
               <tr key={row.id}>
                 <td>
                   <strong>{row.name}</strong>
+                  <small>Owned by {row.ownerName}</small>
                 </td>
                 <td>
                   <strong>{row.current.name}</strong>
@@ -124,7 +134,7 @@ export default function OperatorBilling({
                 <td>
                   <button
                     className="button secondary small"
-                    disabled={!data.hosted}
+                    disabled={!data.hosted || !!row.accountAccess}
                     onClick={() => {
                       setTarget(row);
                       setError("");
@@ -132,6 +142,18 @@ export default function OperatorBilling({
                   >
                     Manage access
                   </button>
+                  {data.canGrantAccountAccess && (
+                    <button
+                      className="button secondary small"
+                      disabled={!data.hosted}
+                      onClick={() => {
+                        setAccount(row);
+                        setError("");
+                      }}
+                    >
+                      Account access
+                    </button>
+                  )}
                 </td>
               </tr>
             ))}
@@ -159,6 +181,95 @@ export default function OperatorBilling({
           </button>
         </div>
       </div>
+      {account && (
+        <Modal
+          title={`Account access for ${account.ownerName}`}
+          onClose={() => {
+            if (!busy) setAccount(null);
+          }}
+        >
+          <form
+            className="simple-form"
+            onSubmit={async (event) => {
+              event.preventDefault();
+              const values = Object.fromEntries(
+                new FormData(event.currentTarget),
+              );
+              setBusy(true);
+              setError("");
+              try {
+                await api(
+                  `/operator/accounts/${account.ownerId}/access`,
+                  values,
+                );
+                setAccount(null);
+                setRevision((v) => v + 1);
+                onChange();
+              } catch (e) {
+                setError((e as Error).message);
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            <p>
+              This applies to all workspaces owned by {account.ownerName}, now
+              and in the future. It grants product features without granting
+              staff access.
+            </p>
+            <label>
+              Account plan
+              <select
+                name="tier"
+                defaultValue={account.accountAccess?.tier || "inherit"}
+              >
+                <option value="free">Free</option>
+                <option value="plus">Plus</option>
+                <option value="pro">Pro</option>
+                <option value="unlimited">
+                  Unlimited · no subscription quotas
+                </option>
+                <option value="inherit">
+                  Remove account grant · use workspace plans
+                </option>
+              </select>
+            </label>
+            <p className="hint">
+              Unlimited removes product quotas. Server capacity, file size
+              limits and abuse protection still apply.
+            </p>
+            <label>
+              Reason for this change
+              <textarea
+                name="reason"
+                required
+                minLength={5}
+                maxLength={500}
+                placeholder="For example: personal account for the service owner"
+              />
+            </label>
+            <label>
+              Your company account password
+              <input
+                name="password"
+                type="password"
+                required
+                maxLength={128}
+                autoComplete="current-password"
+              />
+            </label>
+            {error && (
+              <p className="form-error" role="alert">
+                {error}
+              </p>
+            )}
+            <button className="button primary" disabled={busy}>
+              {busy && <Loader2 size={15} className="spin" />} Save account
+              access
+            </button>
+          </form>
+        </Modal>
+      )}
       {target && (
         <Modal
           title={`Hosted access for ${target.name}`}

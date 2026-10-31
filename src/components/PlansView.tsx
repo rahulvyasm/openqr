@@ -17,6 +17,7 @@ export type Plan = {
   storageBytes: number;
   members: number;
   monthlyINR: number | null;
+  available?: boolean;
 };
 export type PlanSummary = {
   hosted: boolean;
@@ -42,9 +43,11 @@ export type PlanSummary = {
   maxOwnedWorkspaces: number | null;
 };
 export const planSize = (bytes: number) =>
-  bytes >= 1024 ** 3
-    ? `${(bytes / 1024 ** 3).toLocaleString()} GB`
-    : `${Math.round(bytes / 1024 ** 2)} MB`;
+  bytes === Number.MAX_SAFE_INTEGER
+    ? "No plan cap"
+    : bytes >= 1024 ** 3
+      ? `${(bytes / 1024 ** 3).toLocaleString()} GB`
+      : `${Math.round(bytes / 1024 ** 2)} MB`;
 export default function PlansView() {
   const [summary, setSummary] = useState<PlanSummary | null>(null),
     [error, setError] = useState("");
@@ -96,7 +99,9 @@ export default function PlansView() {
                 <h2>{summary.current.name}</h2>
                 <p>
                   {summary.hosted
-                    ? summary.current.source === "manual"
+                    ? ["manual", "account_grant"].includes(
+                        summary.current.source,
+                      )
                       ? "Operator-provisioned access · No online payment was collected."
                       : "Free hosted workspace"
                     : "Self-hosted edition · The complete app, on your infrastructure."}
@@ -120,7 +125,10 @@ export default function PlansView() {
                   label: "Media storage",
                   icon: HardDrive,
                   used: summary.usage.storageBytes,
-                  limit: summary.current.storageBytes,
+                  limit:
+                    summary.current.storageBytes === Number.MAX_SAFE_INTEGER
+                      ? null
+                      : summary.current.storageBytes,
                   description: `${planSize(summary.current.storageBytes)} available`,
                 },
                 {
@@ -162,7 +170,7 @@ export default function PlansView() {
               <h2>
                 {summary.hosted ? "Hosted plans" : "Hosted plans preview"}
               </h2>
-              <span>INR / MONTHLY</span>
+              <span>FREE NOW · MORE COMING SOON</span>
             </div>
             <div className="plan-grid">
               {summary.plans.map((plan) => (
@@ -173,30 +181,21 @@ export default function PlansView() {
                   <span className="studio-kicker">
                     {plan.id === "free"
                       ? "START HERE"
-                      : plan.id === "creator"
+                      : plan.id === "plus"
                         ? "BUILD MOMENTUM"
                         : "GO FURTHER"}
                   </span>
                   <h3>{plan.name}</h3>
                   <p>{plan.description}</p>
                   <div className="plan-price">
-                    {plan.monthlyINR === null ? (
-                      <>
-                        <strong>INR pricing</strong>
-                        <span>Amount to be announced</span>
-                      </>
-                    ) : (
-                      <>
-                        <strong>
-                          {new Intl.NumberFormat("en-IN", {
-                            style: "currency",
-                            currency: "INR",
-                            maximumFractionDigits: 0,
-                          }).format(plan.monthlyINR)}
-                        </strong>
-                        <span>/ workspace / month</span>
-                      </>
-                    )}
+                    <strong>
+                      {plan.id === "free" ? "Free" : "Coming soon"}
+                    </strong>
+                    <span>
+                      {plan.id === "free"
+                        ? "Available now"
+                        : "Early access by invitation"}
+                    </span>
                   </div>
                   <ul>
                     <li>
@@ -225,7 +224,7 @@ export default function PlansView() {
                       ? "Your current plan"
                       : plan.id === "free"
                         ? "Free hosted tier"
-                        : "Checkout not configured"}
+                        : "Coming soon"}
                   </div>
                 </article>
               ))}
@@ -233,17 +232,15 @@ export default function PlansView() {
             <div className="info-note">
               <CreditCard size={19} />
               <div>
-                <strong>Payments are not active on this installation.</strong>
-                <p>
-                  {summary.checkoutMessage} Paid plan access can currently be
-                  provisioned only by authorized OpenQR Billing staff or a
-                  company Super Admin.
-                </p>
+                <strong>Start with Free.</strong>
+                <p>{summary.checkoutMessage}</p>
               </div>
             </div>
             <p className="hint plan-footnote">
               {summary.hosted
-                ? `Each workspace has its own plan. Hosted accounts can own up to ${summary.maxOwnedWorkspaces} workspaces. `
+                ? summary.current.source === "account_grant"
+                  ? "Your account grant applies to all workspaces you own. "
+                  : `Each workspace has its own plan. Hosted accounts can own up to ${summary.maxOwnedWorkspaces} workspaces. `
                 : "Hosted subscriptions pay for the managed service. The open-source self-hosted app includes the full feature set. "}
               Plan limits never pause printed links or delete existing codes.
               Campaign scan caps remain optional choices made by the code owner.
