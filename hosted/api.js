@@ -505,13 +505,17 @@ async function privateRoutes(path, url, req, b, actor, headers, site) {
     putCookie(headers, "oq_workspace", w.id);
     return json({ id: w.id, name, ownerId: actor.user.id, role: "owner" }, 201);
   }
-  if (parts[0] === "workspaces" && parts.length === 2 && method === "PATCH") {
+  if (
+    (path === "/workspace" && method === "PATCH") ||
+    (parts[0] === "workspaces" && parts.length === 2 && method === "PATCH")
+  ) {
+    const workspaceId = path === "/workspace" ? actor.workspace?.id : parts[1];
     if (
-      actor.workspace?.id !== parts[1] ||
+      actor.workspace?.id !== workspaceId ||
       !["owner", "admin"].includes(actor.workspace.role)
     )
       throw problem("Workspace management permission required.", 403);
-    await b.db("oq_workspaces", `id=eq.${parts[1]}`, "PATCH", {
+    await b.db("oq_workspaces", `id=eq.${workspaceId}`, "PATCH", {
       name: safeName((await body(req)).name),
     });
     return json({ ok: true });
