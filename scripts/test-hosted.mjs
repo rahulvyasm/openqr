@@ -31,7 +31,9 @@ try {
   let ready = false;
   for (let n = 0; n < 60; n++) {
     try {
-      run("docker", ["exec", pg, "pg_isready", "-U", "postgres"]);
+      // TCP only answers once the real server is up; the socket also answers
+      // during the image's temporary initialisation server, which then restarts.
+      run("docker", ["exec", pg, "pg_isready", "-h", "127.0.0.1", "-U", "postgres"]);
       ready = true;
       break;
     } catch {
