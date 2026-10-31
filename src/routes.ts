@@ -2,7 +2,7 @@
 export type Route = { page: string; folder: string; settingsTab: string };
 export const settingsTabs = ["team", "workspace", "account", "support", "audit"];
 const pagePaths: Record<string, string> = {
-  codes: "/",
+  codes: "/workspace",
   analytics: "/analytics",
   designs: "/designs",
   media: "/media",
@@ -12,7 +12,7 @@ const pagePaths: Record<string, string> = {
 export function parseRoute(pathname: string): Route {
   const path = pathname.replace(/\/+$/, "") || "/";
   const route = { page: "codes", folder: "", settingsTab: "team" };
-  const folder = path.match(/^\/folders\/([\w-]+)$/);
+  const folder = path.match(/^(?:\/workspace)?\/folders\/([\w-]+)$/);
   if (folder) return { ...route, folder: folder[1] };
   const settings = path.match(/^\/settings(?:\/([a-z]+))?$/);
   if (settings)
@@ -29,6 +29,6 @@ export function parseRoute(pathname: string): Route {
 export function pathFor(page: string, folder = "", settingsTab = "team") {
   if (page === "settings")
     return settingsTab === "team" ? "/settings" : `/settings/${settingsTab}`;
-  if (page === "codes" && folder) return `/folders/${folder}`;
-  return pagePaths[page] || "/";
+  if (page === "codes" && folder) return `/workspace/folders/${folder}`;
+  return pagePaths[page] || "/workspace";
 }
