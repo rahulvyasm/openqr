@@ -1,7 +1,13 @@
 # Changelog
 
-## Unreleased
+## 1.1.0 — 2026-10-31
 
+- Add optional **two-step sign-in** to the hosted beta with an authenticator app (TOTP, via Supabase Auth MFA). Turn it on from My account with a QR code, then confirm with a code. The API treats a password-only session as signed out until the code is verified, rate-limits attempts, and needs the password to turn it off.
+- Give every page its own address: `/workspace` (the QR workspace, where signing in lands), `/analytics`, `/designs`, `/media`, `/plans`, `/settings/<tab>`, `/workspace/folders/<id>` and `/control-room`. Pages and heavy dialogs load as separate chunks, other pages are fetched quietly after sign-in, and analytics load only where they are shown.
+- Speed up hosted requests: the account setup step now runs only for a new account or one without a workspace, and the account lookups run in parallel. Read requests retry on a dropped connection or a 502, 503 or 504.
+- Fix workspace rename on the hosted API, the centring of the code name under the QR preview, and the unreadable "Create a Free account" and "Already have an account" links.
+- Add a GitHub source icon that opens in a new tab in the app, the landing page and the lite site.
+- Add branded HTML emails for signup confirmation and password reset (`supabase/templates/`), and `npm run deploy:supabase` to deploy the Edge Function, apply those emails and enable TOTP.
 - Add a Cloudflare Pages and Supabase hosted beta with verified public signup, private workspace data and media, database-enforced Free quotas, owner bootstrap, audited account grants, and hosted API/browser checks in CI. Document email/domain launch requirements and differences from the Docker application in `docs/HOSTED_BETA.md`.
 
 - Rename hosted tiers to Free, Plus and Pro, hide prices and show Plus/Pro as coming soon. Preserve existing Creator/Business grants. Add Super Admin account grants (Free, Plus, Pro or Unlimited) that apply to current and future owned workspaces. Require password confirmation and a recorded reason, and audit each change atomically. Unlimited removes product quotas while retaining file-size, permission and rate limits.
