@@ -10,6 +10,7 @@ import QRCode from "qrcode";
 import { ArrowUpRight, X } from "lucide-react";
 import { gsap } from "../motion";
 import "../landing.css";
+import GithubLink from "./GithubLink";
 
 const types = [
   "Website",
@@ -314,9 +315,7 @@ export default function Landing({
         {brand}
         <nav>
           <a href="#features">Features</a>
-          <a href="https://github.com/rahulvyasm/openqr" rel="noreferrer">
-            Source
-          </a>
+          <GithubLink label="Source" />
           <button
             className="l-pill"
             data-magnetic
@@ -537,7 +536,9 @@ export default function Landing({
       </section>
       <footer className="l-foot">
         <span>openqr.</span>
-        <span>Crafted for the open web</span>
+        <span>
+          <GithubLink size={16} /> Crafted for the open web
+        </span>
       </footer>
 
       <div

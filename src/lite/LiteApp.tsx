@@ -5,7 +5,6 @@ import {
   Download,
   FileCode2,
   FileImage,
-  Code2,
   Lock,
   QrCode,
   Sparkles,
@@ -17,6 +16,7 @@ import QrImage from "../components/QrImage";
 import { useDesignHistory } from "../components/useDesignHistory";
 import { svgToPng } from "../demo/png";
 import { joinWaitlist, waitlistEnabled } from "./waitlist";
+import GithubLink from "../components/GithubLink";
 
 type Field = {
   key: string;
@@ -209,7 +209,7 @@ export default function LiteApp() {
           <span>openqr<b>.</b></span>
         </a>
         <nav>
-          <a href="https://github.com/rahulvyasm/openqr" rel="noreferrer"><Code2 size={16} /> Source</a>
+          <GithubLink label="Source" size={16} />
           <a className="lite-pill" href="/demo/">See full potential <ArrowUpRight size={15} /></a>
         </nav>
       </header>
@@ -324,9 +324,9 @@ export default function LiteApp() {
       <footer className="lite-foot">
         <span>openqr. MIT licensed. Self-host it, or wait for the hosted version.</span>
         <span>
-          <a href="https://github.com/rahulvyasm/openqr" rel="noreferrer">GitHub</a>
+          <GithubLink label="GitHub" size={14} />
           {" · "}
-          <a href="https://github.com/rahulvyasm/openqr/blob/main/SECURITY.md" rel="noreferrer">Security</a>
+          <a href="https://github.com/rahulvyasm/openqr/blob/main/SECURITY.md" target="_blank" rel="noopener noreferrer">Security</a>
         </span>
       </footer>
     </div>

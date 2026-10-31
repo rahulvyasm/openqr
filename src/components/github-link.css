@@ -1,0 +1,16 @@
+.github-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: inherit;
+  opacity: 0.8;
+  text-decoration: none;
+  transition: opacity 0.15s;
+}
+.github-link:hover,
+.github-link:focus-visible {
+  opacity: 1;
+}
+.github-link svg {
+  flex: none;
+}

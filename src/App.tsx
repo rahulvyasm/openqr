@@ -3,7 +3,6 @@ import {
   Activity,
   ArrowDownToLine,
   ArrowRight,
-  ArrowUpRight,
   BarChart3,
   Blocks,
   CheckCircle2,
@@ -59,6 +58,7 @@ import AccessFlow, {
   type AccessLink,
 } from "./components/AccessFlow";
 import WorkspaceSwitcher from "./components/WorkspaceSwitcher";
+import GithubLink from "./components/GithubLink";
 import SettingsView from "./components/SettingsView";
 import Modal from "./components/Modal";
 import QrImage from "./components/QrImage";
@@ -1005,6 +1005,7 @@ export default function App() {
             <span>Jump to anything</span>
             <kbd>Ctrl K</kbd>
           </button>
+          <GithubLink />
           <span className="topbar-open">
             <span className="signal-dot" /> INDEPENDENT BY DESIGN
           </span>
@@ -1682,7 +1683,8 @@ export default function App() {
               openqr. <span> / THE CONNECTION STUDIO</span>
             </span>
             <span>
-              Crafted for the open web <ArrowUpRight size={12} />
+              <GithubLink size={14} />
+              {" "}Crafted for the open web
             </span>
           </footer>
         </main>
