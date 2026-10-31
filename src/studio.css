@@ -2847,3 +2847,17 @@ kbd {
   text-decoration: underline;
   font: inherit;
 }
+
+.brand-logo {
+  display: block;
+  flex: none;
+  width: 37px;
+  height: 37px;
+  border-radius: 11px;
+}
+@media (max-width: 760px) {
+  .brand-logo {
+    width: 33px;
+    height: 33px;
+  }
+}

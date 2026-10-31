@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="color-scheme" content="dark">
+<meta name="supported-color-schemes" content="dark">
+<title>Confirm your OpenQR account</title>
+</head>
+<body style="margin:0;padding:0;background-color:#0a0d0b;">
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:#0a0d0b;font-size:1px;line-height:1px;">One tap to confirm your email and open your workspace.</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#0a0d0b" style="background-color:#0a0d0b;">
+<tr><td align="center" style="padding:40px 16px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:520px;">
+<tr><td style="padding:0 4px 24px 4px;">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
+<td style="padding-right:12px;"><img src="https://openqr.riolet.si/email/logo.png" width="44" height="44" alt="OpenQR" border="0" style="display:block;border-radius:12px;"></td>
+<td style="font-family:Helvetica,Arial,sans-serif;font-size:26px;line-height:30px;font-weight:700;letter-spacing:-0.5px;color:#f1f6ee;">openqr<span style="color:#d4f55a;">.</span></td>
+</tr></table>
+</td></tr>
+<tr><td bgcolor="#111814" style="background-color:#111814;border:1px solid #243229;border-radius:20px;padding:40px 36px;">
+<p style="margin:0 0 14px 0;font-family:Courier New,monospace;font-size:11px;line-height:16px;letter-spacing:2px;color:#d4f55a;">OPENQR / YOUR CONNECTION STUDIO</p>
+<h1 style="margin:0 0 16px 0;font-family:Helvetica,Arial,sans-serif;font-size:32px;line-height:38px;font-weight:700;letter-spacing:-1px;color:#f1f6ee;">Welcome to OpenQR.</h1>
+<p style="margin:0 0 30px 0;font-family:Helvetica,Arial,sans-serif;font-size:16px;line-height:26px;color:#b4c4b9;">You are one tap away from your workspace. Confirm that this is your email address and you can start creating QR codes that you fully own.</p>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
+<td align="center" bgcolor="#d4f55a" style="background-color:#d4f55a;border-radius:999px;">
+<a href="{{ .SiteURL }}/?token_hash={{ .TokenHash }}&amp;type=signup" target="_blank" style="display:inline-block;padding:16px 34px;font-family:Helvetica,Arial,sans-serif;font-size:16px;line-height:20px;font-weight:700;color:#0a120e;text-decoration:none;border-radius:999px;">Confirm my email &rarr;</a>
+</td></tr></table>
+<p style="margin:30px 0 6px 0;font-family:Helvetica,Arial,sans-serif;font-size:13px;line-height:20px;color:#8ea397;">Button not working? Paste this link into your browser:</p>
+<p style="margin:0 0 28px 0;font-family:Helvetica,Arial,sans-serif;font-size:13px;line-height:20px;word-break:break-all;"><a href="{{ .SiteURL }}/?token_hash={{ .TokenHash }}&amp;type=signup" target="_blank" style="color:#d4f55a;text-decoration:underline;">{{ .SiteURL }}/?token_hash={{ .TokenHash }}&amp;type=signup</a></p>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td style="border-top:1px solid #243229;padding-top:20px;font-family:Helvetica,Arial,sans-serif;font-size:13px;line-height:20px;color:#8ea397;">This link works once and expires soon. If you did not create an OpenQR account, you can safely ignore this email and nothing will happen.</td></tr></table>
+</td></tr>
+<tr><td style="padding:24px 8px 0 8px;font-family:Helvetica,Arial,sans-serif;font-size:12px;line-height:19px;color:#6f8377;text-align:center;">Sent to {{ .Email }} because someone used it to sign up.<br>OpenQR &middot; Independent by design &middot; <a href="https://openqr.riolet.si" target="_blank" style="color:#8ea397;text-decoration:underline;">openqr.riolet.si</a></td></tr>
+</table>
+</td></tr>
+</table>
+</body>
+</html>
