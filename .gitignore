@@ -14,6 +14,7 @@ playwright-report/
 dist-lite/
 dist-hosted/
 .hosted-build/
+supabase/.temp/
 .env.*.local
 .dev.vars*
 .shot*.mjs
