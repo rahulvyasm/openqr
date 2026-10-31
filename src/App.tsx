@@ -94,7 +94,9 @@ const OperatorConsole = React.lazy(
 function Brand() {
   return (
     <div className="brand">
-      <img className="brand-logo" src="/logo.svg" alt="" width={37} height={37} />
+      <span className="brand-mark">
+        <QrCode size={23} />
+      </span>
       <span>
         open<span className="brand-light">qr</span>
         <span className="brand-dot">.</span>

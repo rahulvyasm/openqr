@@ -449,7 +449,10 @@
   .l-demo-qr {
     width: min(240px, 70vw);
   }
-  .l-nav nav a {
+  .l-nav nav a:not(.github-link) {
+    display: none;
+  }
+  .l-nav nav .github-link span {
     display: none;
   }
   .l-bento {

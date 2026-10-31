@@ -6,6 +6,7 @@ import {
   FileCode2,
   FileImage,
   Lock,
+  QrCode,
   Sparkles,
 } from "lucide-react";
 import { defaultDesign, renderSvg } from "../../shared/qr.js";
@@ -204,7 +205,7 @@ export default function LiteApp() {
     <div className="lite">
       <header className="lite-nav">
         <a className="brand" href="/" aria-label="OpenQR home">
-          <img className="brand-logo" src="/logo.svg" alt="" width={37} height={37} />
+          <span className="brand-mark"><QrCode size={23} /></span>
           <span>openqr<b>.</b></span>
         </a>
         <nav>
