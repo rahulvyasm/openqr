@@ -1294,7 +1294,7 @@ select:disabled {
   text-align: center;
   font-size: 11px;
   color: #7d9b8c;
-  margin-top: 9px;
+  margin: 9px auto 0;
   max-width: 205px;
   overflow-wrap: anywhere;
 }
