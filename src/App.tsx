@@ -325,6 +325,8 @@ export default function App({ urlRouting = true }: { urlRouting?: boolean }) {
       ? parseRoute(window.location.pathname)
       : { page: "codes", folder: "", settingsTab: "team" },
   ).current;
+  // Where a signed-out visitor was heading, so signing in can take them there.
+  const intended = useRef<string | null>(null);
   useEffect(() => startMotion(), []);
   const [auth, setAuth] = useState<AuthState | null>(null);
   const [accessLink, setAccessLink] = useState<AccessLink | null>(
@@ -498,7 +500,19 @@ export default function App({ urlRouting = true }: { urlRouting?: boolean }) {
           urlRouting && parseRoute(window.location.pathname).page === "operator";
         if (data.user && !data.operator && onControlRoom) showPage("codes");
         else if (data.operator && !data.workspace) showPage("operator");
-        else if (urlRouting && data.user) {
+        else if (urlRouting && data.user && intended.current && window.location.pathname === "/") {
+          // Signing in from the landing page: continue to the page they asked for.
+          const route = parseRoute(intended.current);
+          intended.current = null;
+          setPage(route.page);
+          setFolder(route.folder);
+          setSettingsTab(route.settingsTab);
+          window.history.replaceState(
+            null,
+            "",
+            pathFor(route.page, route.folder, route.settingsTab),
+          );
+        } else if (urlRouting && data.user) {
           // Turn an unknown address into the page it actually shows.
           const route = parseRoute(window.location.pathname);
           const canonical = pathFor(route.page, route.folder, route.settingsTab);
@@ -591,6 +605,14 @@ export default function App({ urlRouting = true }: { urlRouting?: boolean }) {
       loadTemplates();
     }
   }, [auth?.user?.id, auth?.workspace?.id, auth?.workspace?.role, days]);
+  useEffect(() => {
+    // The landing page and sign-in always live at the plain address.
+    if (!urlRouting || !auth || auth.user) return;
+    if (window.location.pathname !== "/") {
+      intended.current = window.location.pathname;
+      window.history.replaceState(null, "", "/");
+    }
+  }, [auth?.user?.id, !!auth]);
   useEffect(() => {
     // Only platform staff have a control room.
     if (page === "operator" && auth?.user && !auth.operator) showPage("codes");
