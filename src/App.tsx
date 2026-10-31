@@ -104,7 +104,8 @@ function Brand() {
     </div>
   );
 }
-function Auth({ setup, publicSignup = false, onSuccess }: { setup: boolean; publicSignup?: boolean; onSuccess: () => void }) {
+function Auth({ setup, publicSignup = false, mfaRequired = false, onSuccess }: { setup: boolean; publicSignup?: boolean; mfaRequired?: boolean; onSuccess: () => void }) {
+  const [mfa, setMfa] = useState(mfaRequired);
   const [register, setRegister] = useState(false);
   const [notice, setNotice] = useState("");
   const [recoveryHelp, setRecoveryHelp] = useState(false);
@@ -116,7 +117,11 @@ function Auth({ setup, publicSignup = false, onSuccess }: { setup: boolean; publ
     setError("");
     const form = new FormData(e.currentTarget);
     try {
-      const result = await api<{ verificationRequired?: boolean }>(`/auth/${setup ? "setup" : register ? "signup" : "login"}`, Object.fromEntries(form));
+      const result = await api<{ verificationRequired?: boolean; mfaRequired?: boolean }>(`/auth/${setup ? "setup" : register ? "signup" : "login"}`, Object.fromEntries(form));
+      if (result.mfaRequired) {
+        setMfa(true);
+        return;
+      }
       if (result.verificationRequired) {
         setNotice("Check your email to confirm your account, then sign in.");
         setRegister(false);
@@ -129,6 +134,64 @@ function Auth({ setup, publicSignup = false, onSuccess }: { setup: boolean; publ
       setBusy(false);
     }
   }
+  if (mfa)
+    return (
+      <Landing setup={false} brand={<Brand />}>
+        <div className="auth-form-wrap">
+          <span className="small-label">OPENQR / TWO-STEP SIGN-IN</span>
+          <h2>One more step.</h2>
+          <p>Enter the 6-digit code from your authenticator app.</p>
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault();
+              setBusy(true);
+              setError("");
+              try {
+                await api("/auth/mfa/verify", Object.fromEntries(new FormData(e.currentTarget)));
+                onSuccess();
+              } catch (e) {
+                setError((e as Error).message);
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            <label>
+              Authentication code
+              <input
+                name="code"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                placeholder="123456"
+                pattern="[0-9]{6}"
+                maxLength={6}
+                required
+                autoFocus
+              />
+            </label>
+            {error && (
+              <div className="form-error" role="alert">
+                {error}
+              </div>
+            )}
+            <button className="button primary full" disabled={busy}>
+              {busy ? <Loader2 size={18} className="spin" /> : <>Verify<ArrowRight size={18} /></>}
+            </button>
+          </form>
+          <button
+            className="text-button auth-switch"
+            type="button"
+            onClick={async () => {
+              try { await api("/auth/logout", {}); } catch { /* Already signed out. */ }
+              setMfa(false);
+              setError("");
+            }}
+          >
+            Use a different account
+          </button>
+        </div>
+      </Landing>
+    );
   return (
     <Landing setup={setup} brand={<Brand />}>
       <div className="auth-form-wrap">
@@ -552,7 +615,7 @@ export default function App() {
       />
     );
   if (!auth.user)
-    return <Auth setup={auth.setupRequired} publicSignup={auth.publicSignup} onSuccess={loadAuth} />;
+    return <Auth setup={auth.setupRequired} publicSignup={auth.publicSignup} mfaRequired={auth.mfaRequired} onSuccess={loadAuth} />;
   const canEdit = mayEdit(auth.workspace?.role);
   const workspaceChanged = () => {
     generation.current++;

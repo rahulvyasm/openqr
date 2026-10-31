@@ -237,7 +237,13 @@ async function authRoutes(path, req, b, headers, site) {
       putCookie(headers, "oq_access", session.access_token);
       putCookie(headers, "oq_refresh", session.refresh_token);
     }
-    return json({ ok: true, verificationRequired: !session.access_token });
+    return json({
+      ok: true,
+      verificationRequired: !session.access_token,
+      mfaRequired: !!session.user?.factors?.some(
+        (f) => f.factor_type === "totp" && f.status === "verified",
+      ),
+    });
   }
   if (path === "/auth/recover") {
     await b.rate("recover:" + req.headers.get("x-openqr-ip"), 5, 3600);
@@ -304,6 +310,47 @@ async function authRoutes(path, req, b, headers, site) {
   return null;
 }
 
+const mfaCode = z.object({ code: z.string().regex(/^\d{6}$/) });
+async function mfaSession(b, access, factorId, code, headers) {
+  const challenge = await b.auth(
+    `factors/${factorId}/challenge`,
+    {},
+    access,
+  );
+  let session;
+  try {
+    session = await b.auth(
+      `factors/${factorId}/verify`,
+      { challenge_id: challenge.id, code },
+      access,
+    );
+  } catch {
+    throw problem("That code did not work. Check the app and try again.", 400);
+  }
+  putCookie(headers, "oq_access", session.access_token);
+  putCookie(headers, "oq_refresh", session.refresh_token);
+}
+
+// A password-only session may do nothing except finish two-step sign-in or sign out.
+async function mfaChallengeRoutes(path, req, b, actor, headers) {
+  if (path === "/auth/logout" && req.method === "POST") {
+    try {
+      await b.auth("logout?scope=local", {}, actor.access);
+    } finally {
+      for (const key of ["oq_access", "oq_refresh", "oq_workspace"])
+        putCookie(headers, key, "", 0);
+    }
+    return json({ ok: true });
+  }
+  if (path === "/auth/mfa/verify" && req.method === "POST") {
+    await b.rate("mfa:" + actor.user.id, 10, 900);
+    const { code } = mfaCode.parse(await body(req));
+    await mfaSession(b, actor.access, actor.factorId, code, headers);
+    return json({ ok: true });
+  }
+  throw problem("Enter your two-step sign-in code.", 401);
+}
+
 export function createHostedHandler(env, fetcher = fetch) {
   return async (request) => {
     const headers = new Headers({
@@ -348,10 +395,25 @@ export function createHostedHandler(env, fetcher = fetch) {
         response = await publicRoutes(path, url, request, b, site);
       if (!response && api) {
         const actor = await identity(b, request, headers);
-        if (path === "/auth/status")
+        if (actor?.mfaPending)
+          response =
+            path === "/auth/status"
+              ? json({
+                  setupRequired: false,
+                  publicSignup: true,
+                  user: null,
+                  mfaRequired: true,
+                  hosted: true,
+                  publicUrl: SITE,
+                  workspace: null,
+                  workspaces: [],
+                })
+              : await mfaChallengeRoutes(path, request, b, actor, headers);
+        else if (path === "/auth/status")
           response = json({
             setupRequired: false,
             publicSignup: true,
+            mfaEnabled: !!actor?.factorId,
             user: actor?.user || null,
             operator: !!actor?.staff,
             operatorRole: actor?.staff || null,
@@ -426,6 +488,50 @@ async function privateRoutes(path, url, req, b, actor, headers, site) {
       for (const key of ["oq_access", "oq_refresh", "oq_workspace"])
         putCookie(headers, key, "", 0);
     }
+    return json({ ok: true });
+  }
+  if (path === "/auth/mfa/enroll" && method === "POST") {
+    if (actor.factorId)
+      throw problem("Two-step sign-in is already on.", 409);
+    await b.rate("mfa-enroll:" + actor.user.id, 10, 900);
+    const current = await b.auth("user", undefined, actor.access);
+    // Abandoned, never-confirmed setups would otherwise block a fresh one.
+    for (const f of current.factors || [])
+      if (f.status !== "verified")
+        await b.auth(`factors/${f.id}`, undefined, actor.access, "DELETE");
+    const factor = await b.auth(
+      "factors",
+      {
+        factor_type: "totp",
+        issuer: "OpenQR",
+        friendly_name: "OpenQR " + uid().slice(0, 8),
+      },
+      actor.access,
+    );
+    return json({
+      factorId: factor.id,
+      qr: factor.totp.qr_code,
+      secret: factor.totp.secret,
+    });
+  }
+  if (path === "/auth/mfa/confirm" && method === "POST") {
+    await b.rate("mfa:" + actor.user.id, 10, 900);
+    const input = mfaCode
+      .extend({ factorId: z.string().uuid() })
+      .parse(await body(req));
+    await mfaSession(b, actor.access, input.factorId, input.code, headers);
+    return json({ ok: true });
+  }
+  if (path === "/auth/mfa/disable" && method === "POST") {
+    if (!actor.factorId) throw problem("Two-step sign-in is already off.");
+    await b.rate("mfa:" + actor.user.id, 10, 900);
+    const input = await body(req);
+    const check = await b.auth("token?grant_type=password", {
+      email: actor.user.email,
+      password: typeof input.password === "string" ? input.password : "",
+    });
+    await b.auth("logout?scope=local", {}, check.access_token);
+    await b.auth(`factors/${actor.factorId}`, undefined, actor.access, "DELETE");
     return json({ ok: true });
   }
   if (path === "/auth/profile" && method === "PATCH") {

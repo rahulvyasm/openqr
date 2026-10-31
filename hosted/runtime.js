@@ -277,6 +277,17 @@ export async function identity(backend, req, headers) {
     }))
   )
     return null;
+  const totp = (user.factors || []).find(
+    (f) => f.factor_type === "totp" && f.status === "verified",
+  );
+  // A password alone is not enough once an authenticator app is enrolled.
+  if (totp && claims.aal !== "aal2")
+    return {
+      mfaPending: true,
+      factorId: totp.id,
+      access,
+      user: { id: user.id, email: user.email },
+    };
   await backend.rpc("oq_bootstrap", {
     p_actor: user.id,
     p_name: user.user_metadata?.name || user.email.split("@")[0],
@@ -300,6 +311,7 @@ export async function identity(backend, req, headers) {
     user: { id: user.id, name: account.name, email: user.email },
     access,
     sessionId: claims.session_id,
+    factorId: totp?.id || null,
     staff: staff?.role || null,
     workspaces,
     workspace:

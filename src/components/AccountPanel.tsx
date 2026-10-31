@@ -8,6 +8,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { api, type AuthState } from "../lib";
+import TwoStepPanel from "./TwoStepPanel";
 type Session = {
   id: string;
   label: string;
@@ -173,6 +174,13 @@ export default function AccountPanel({
           </button>
         </form>
       </section>
+      {auth.hosted && (
+        <TwoStepPanel
+          enabled={!!auth.mfaEnabled}
+          onAuthChange={onAuthChange}
+          notify={notify}
+        />
+      )}
       <section className="settings-panel">
         <div className="settings-panel-heading">
           <div>

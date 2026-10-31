@@ -20,6 +20,10 @@ The bootstrap email is stored in the private `oq_launch_config` table. Only a co
 
 Auth callback tokens are exchanged for Secure, HttpOnly, SameSite=Lax cookies and removed from the address bar. Workspace data is not exposed through direct anonymous or authenticated database grants. Privileged database functions are service-only; RLS is enabled on application tables. Media deletion checks current codes, drafts and retained versions.
 
+## Two-step sign-in
+
+Users can turn on authenticator-app (TOTP) two-step sign-in from My account. It uses Supabase Auth MFA, so keep TOTP enrollment and verification enabled under Authentication → Sign In / Providers → Multi-Factor. Once a verified factor exists, the API treats any session that has not passed the code step (below `aal2`) as signed out: it exposes only `/auth/status`, `/auth/mfa/verify` and `/auth/logout`. Turning it off requires the account password. Recovery codes are not issued, so losing the authenticator app needs an administrator to remove the factor in Supabase Auth.
+
 ## Checks
 
 `npm run test:hosted` requires Docker and Playwright Chromium (Edge on Windows). It creates and removes its own disposable database/API containers, applies migrations, runs SQL isolation checks, tests the API against Postgres, and checks signup, login, QR creation and admin grants in a browser. Auth is mocked in these tests; real email delivery and recovery must also be checked in the hosted environment. CI runs these checks alongside the existing server, lite and Docker jobs.

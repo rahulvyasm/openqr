@@ -127,6 +127,8 @@ export type AuthState = {
   operator?: boolean;
   operatorRole?: string | null;
   hosted?: boolean;
+  mfaRequired?: boolean;
+  mfaEnabled?: boolean;
   setupRequired: boolean;
   user: User | null;
   publicUrl: string;
