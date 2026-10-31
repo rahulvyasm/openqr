@@ -113,6 +113,19 @@ const svgFor = (code) => {
   );
 };
 
+// Rendered here, not taken from Auth: its raw SVG data URI is not escaped and some browsers refuse to draw it.
+const totpQr = (uri) => {
+  const { data, size } = QRCode.create(uri, { errorCorrectionLevel: "M" }).modules;
+  const margin = 4;
+  let path = "";
+  for (let y = 0; y < size; y++)
+    for (let x = 0; x < size; x++)
+      if (data[y * size + x]) path += `M${x + margin} ${y + margin}h1v1h-1z`;
+  const side = size + margin * 2;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${side} ${side}" shape-rendering="crispEdges"><rect width="${side}" height="${side}" fill="#fff"/><path d="${path}" fill="#000"/></svg>`;
+  return "data:image/svg+xml;base64," + btoa(svg);
+};
+
 export async function billing(b, workspace, document) {
   const grant = (
     await b.db(
@@ -510,7 +523,7 @@ async function privateRoutes(path, url, req, b, actor, headers, site) {
     );
     return json({
       factorId: factor.id,
-      qr: factor.totp.qr_code,
+      qr: totpQr(factor.totp.uri),
       secret: factor.totp.secret,
     });
   }

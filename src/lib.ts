@@ -161,13 +161,28 @@ export async function api<T>(
   body?: unknown,
   method = "GET",
 ): Promise<T> {
-  const res = await fetch(`/api${path}`, {
-    method: body === undefined ? method : method === "GET" ? "POST" : method,
-    credentials: "same-origin",
-    headers: body === undefined ? {} : { "Content-Type": "application/json" },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
-  const data = await res.json();
+  const verb = body === undefined ? method : method === "GET" ? "POST" : method;
+  // Reads are safe to repeat, so ride out a cold start or a dropped connection.
+  const attempts = verb === "GET" ? 3 : 1;
+  let res: Response | undefined;
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    if (attempt) await new Promise((r) => setTimeout(r, 500 * attempt));
+    try {
+      res = await fetch(`/api${path}`, {
+        method: verb,
+        credentials: "same-origin",
+        headers:
+          body === undefined ? {} : { "Content-Type": "application/json" },
+        body: body === undefined ? undefined : JSON.stringify(body),
+      });
+    } catch (e) {
+      if (attempt === attempts - 1) throw e;
+      continue;
+    }
+    if (![502, 503, 504].includes(res.status)) break;
+  }
+  res = res as Response;
+  const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     if (res.status === 403)
       window.dispatchEvent(new Event("permissions-changed"));
